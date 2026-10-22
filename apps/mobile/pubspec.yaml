@@ -1,0 +1,35 @@
+name: ho_nha_toi
+description: "Ung dung gia pha va cong dong dong ho Ho Nha Toi."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Quản lý state
+  flutter_riverpod: ^2.5.1
+  # Gọi API backend
+  dio: ^5.4.3
+  # Lưu token an toàn (Keychain / Keystore)
+  flutter_secure_storage: ^9.2.2
+  # Lưu cài đặt nhẹ (theme mode, ...)
+  shared_preferences: ^2.2.3
+  # Định dạng ngày giờ, số
+  intl: ^0.19.0
+  # Lịch sự kiện dòng họ
+  table_calendar: ^3.1.2
+  # Cache ảnh đại diện, ảnh sự kiện
+  cached_network_image: ^3.3.1
+  # Font Be Vietnam Pro (tải lúc chạy lần đầu, cần mạng)
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+
+flutter:
+  uses-material-design: true
