@@ -37,29 +37,35 @@ export class GenealogyController {
 
   @Get('lineages/:lineageId/persons')
   @UseGuards(LineageGuard)
-  searchPersons(@Param('lineageId') lineageId: string, @Query('q') q = '') {
-    return this.genealogy.searchPersons(lineageId, q);
+  searchPersons(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Query('q') q = '',
+  ) {
+    return this.genealogy.searchPersons(lineageId, userId, q);
   }
 
   @Get('lineages/:lineageId/tree')
   @UseGuards(LineageGuard)
   getTree(
     @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
     @Query('root_person_id') rootPersonId?: string,
     @Query('generations') generations?: string,
     @Query('branch') branch?: string,
   ) {
-    return this.genealogy.getTree(lineageId, {
+    return this.genealogy.getTree(lineageId, userId, {
       rootPersonId,
-      generations: generations ? Number(generations) : undefined,
+      generations: generations ? Number(generations) || 3 : undefined,
       branch,
     });
   }
 
   @Get('persons/:id')
-  findPerson(@Param('id') id: string) {
-    // TODO: resolve lineageId từ person rồi kiểm tra can_view qua LineageGuard mở rộng.
-    return this.genealogy.findPerson(id);
+  findPerson(@Param('id') id: string, @CurrentUserId() userId: string) {
+    // LineageGuard không áp dụng ở đây (không có :lineageId);
+    // service tự resolve lineage từ bản ghi và kiểm tra membership + canView.
+    return this.genealogy.findPerson(id, userId);
   }
 
   @Patch('persons/:id')
@@ -72,8 +78,8 @@ export class GenealogyController {
   }
 
   @Delete('persons/:id')
-  removePerson(@Param('id') id: string) {
-    return this.genealogy.removePerson(id);
+  removePerson(@Param('id') id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.removePerson(id, userId);
   }
 
   @Post('lineages/:lineageId/relationships')
@@ -87,8 +93,11 @@ export class GenealogyController {
   }
 
   @Delete('relationships/:id')
-  removeRelationship(@Param('id') id: string) {
-    return this.genealogy.removeRelationship(id);
+  removeRelationship(
+    @Param('id') id: string,
+    @CurrentUserId() userId: string,
+  ) {
+    return this.genealogy.removeRelationship(id, userId);
   }
 
   @Post('lineages/:lineageId/proposals')
@@ -103,8 +112,12 @@ export class GenealogyController {
 
   @Get('lineages/:lineageId/proposals')
   @UseGuards(LineageGuard)
-  listProposals(@Param('lineageId') lineageId: string, @Query('status') status?: string) {
-    return this.genealogy.listProposals(lineageId, status);
+  listProposals(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Query('status') status?: string,
+  ) {
+    return this.genealogy.listProposals(lineageId, userId, status);
   }
 
   @Post('proposals/:id/approve')
@@ -123,7 +136,7 @@ export class GenealogyController {
   }
 
   @Get('persons/:id/history')
-  personHistory(@Param('id') id: string) {
-    return this.genealogy.personHistory(id);
+  personHistory(@Param('id') id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.personHistory(id, userId);
   }
 }
