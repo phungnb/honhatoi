@@ -1,32 +1,75 @@
-# HỌ NHÀ TÔI
+# HỌ NHÀ TÔI — Monorepo
 
-Ứng dụng gia phả số và kết nối gia đình — lưu giữ cội nguồn, kết nối họ hàng qua nhiều thế hệ.
+Ứng dụng gia phả số + cộng đồng dòng họ + mạng xã hội gia đình (tiếng Việt).
 
-## Tầm nhìn
+## Kiến trúc
 
-- **Gia phả số**: cây gia phả nhiều thế hệ, hồ sơ thành viên, ngày giỗ, tư liệu gia đình.
-- **Cộng đồng dòng họ**: bảng tin, phòng chat, sự kiện, danh bạ thành viên.
-- **Mạng xã hội gia đình**: chat riêng, nhóm "Gia đình tôi", chia sẻ ảnh/video.
+```
+honhatoi/
+├── apps/
+│   ├── mobile/        # Flutter — app mobile Android/iOS (1 codebase)
+│   └── web-admin/     # Next.js — web quản trị dòng họ & hệ thống
+├── services/
+│   └── api/           # NestJS + Prisma + PostgreSQL — API backend dùng chung
+├── docs/
+│   └── PRD/           # Bộ tài liệu đặc tả (PRD, UI/UX, kỹ thuật, bảo mật, test)
+└── prototype/         # Bản mẫu tương tác HTML (tham khảo giao diện)
+```
 
-Nguyên tắc xuyên suốt: ưu tiên người lớn tuổi, riêng tư theo mặc định, không bắt buộc thay thế Zalo.
+Luồng: Mobile / Web quản trị → HTTPS + WebSocket → NestJS API → PostgreSQL.
+Mọi dữ liệu đều gắn với một dòng họ (`lineage_id`); backend ép cô lập: thành viên họ này
+không thể truy cập dữ liệu họ kia (xem `services/api/src/common/guards/lineage.guard.ts`).
 
-## Tài liệu
+## Thiết kế
 
-| Tài liệu | Nội dung |
-|---|---|
-| [00-Index](docs/PRD/00-Index.md) | Tổng mục, quy ước mã yêu cầu |
-| [PRD](docs/PRD/01-PRD/PRD.md) | 99 yêu cầu chức năng (HNT-F-001–099) + 18 phi chức năng (HNT-N-001–018), tiêu chí nghiệm thu Given–When–Then |
-| [UI/UX](docs/PRD/02-UI-UX/UIUX-Spec.md) | 16 màn hình (HNT-U-001–016), 5 luồng thao tác |
-| [Kỹ thuật](docs/PRD/03-KyThuat/Technical-Spec.md) | Kiến trúc, sơ đồ CSDL, API, realtime (HNT-T-001–027) |
-| [Bảo mật](docs/PRD/04-BaoMat/Security-Matrix.md) | Ma trận phân quyền 7 vai trò, chính sách dữ liệu (HNT-S-001–015) |
-| [Test Plan](docs/PRD/05-TestPlan/Test-Plan.md) | 78 test case (HNT-P-001–078): chức năng, hiệu năng, bảo mật, usability |
+Bộ màu **Modern Family Tech v1** (đã chốt):
+- Dark: nền `#0B0F14`, thẻ `#151A24`, nhấn `#A3FF12`, chữ `#F5F7FA`, chữ phụ `#B4C0D0`, viền `#303B4D`, điểm nhấn ấm `#E8B86D`
+- Light: nền `#F6F4EE`, nhấn `#4E9A00`, chữ `#1B2029`
+- Font: Be Vietnam Pro. Xem chi tiết trong `prototype/index.html`.
 
-## Công nghệ đề xuất (theo đặc tả)
+## Chạy từng phần
 
-- Mobile: Flutter hoặc React Native · Web quản trị: Next.js
-- Backend: NestJS (hoặc BaaS) · CSDL: PostgreSQL · Realtime: WebSocket
-- Push: FCM/APNs · Lưu trữ: Object Storage (signed URL)
+### 1. Backend API
+
+```bash
+cd services/api
+npm install
+cp .env.example .env        # sửa DATABASE_URL, JWT_SECRET
+npx prisma migrate dev      # tạo bảng theo schema.prisma (36 bảng)
+npx prisma db seed          # dữ liệu demo: 2 dòng họ, hồ sơ mẫu
+npm run start:dev            # API chạy ở http://localhost:3001/api/v1
+```
+
+### 2. App mobile (Flutter)
+
+Cài Flutter SDK 3.x trước (https://docs.flutter.dev/get-started/install).
+
+```bash
+cd apps/mobile
+flutter pub get
+flutter run                 # chọn thiết bị/emulator
+```
+
+Mặc định app trỏ về `http://10.0.2.2:3000` trên Android emulator —
+sửa trong `lib/core/config.dart` cho đúng địa chỉ API của bạn.
+
+### 3. Web quản trị
+
+```bash
+cd apps/web-admin
+npm install
+cp .env.example .env        # NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+npm run dev                 # http://localhost:3000
+```
 
 ## Trạng thái
 
-Tài liệu đặc tả hoàn tất (2026-10-22). Triển khai theo 3 giai đoạn: MVP → hoàn thiện → mở rộng (xem PRD mục 5).
+Đây là **khung dự án (scaffold)** — kiến trúc, theme, schema dữ liệu và API khung đã có;
+logic nghiệp vụ chi tiết trong các service được đánh dấu `TODO` để triển khai tiếp
+theo tài liệu trong `docs/PRD/`.
+
+## Tài liệu
+
+- Đặc tả: `docs/PRD/00-Index.md`
+- Kỹ thuật: `docs/PRD/03-KyThuat/Technical-Spec.md`
+- Bảo mật & phân quyền: `docs/PRD/04-BaoMat/Security-Matrix.md`
