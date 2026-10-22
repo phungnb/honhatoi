@@ -13,6 +13,7 @@
   --bg:#0B0F14; --surface:#151A24; --surface2:#1C2432; --border:#303B4D;
   --text:#F5F7FA; --muted:#B4C0D0; --muted2:#8A96A8;
   --brand:#A3FF12; --brand-deep:#8FE000; --on-brand:#0B0F14; --warm:#E8B86D;
+  --brand-soft:rgba(163,255,18,.13); --brand-border:rgba(163,255,18,.38);
   --coin:#FFB020; --xp:#7C9CFF; --live:#FF3B5C;
   --ok:#22C55E; --warn:#F59E0B; --err:#EF4444;
   --r-card:16px; --r-lg:24px;
@@ -92,7 +93,7 @@ body{
   display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
   background:var(--surface2);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--muted);
 }
-.chip.on{background:rgba(163,255,18,.12);border-color:rgba(163,255,18,.4);color:var(--brand)}
+.chip.on{background:var(--brand-soft);border-color:var(--brand-border);color:var(--brand)}
 button.chip{font-family:var(--font);cursor:pointer}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 /* ===== Tabbar ===== */
@@ -115,7 +116,7 @@ button.chip{font-family:var(--font);cursor:pointer}
 .row .t1{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .t2{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
-.pill.green{background:rgba(182,255,59,.12);color:var(--brand);border-color:rgba(182,255,59,.35)}
+.pill.green{background:var(--brand-soft);color:var(--brand);border-color:var(--brand-border)}
 .pill.red{background:rgba(255,59,92,.12);color:var(--live);border-color:rgba(255,59,92,.35)}
 .pill.blue{background:rgba(124,156,255,.12);color:var(--xp);border-color:rgba(124,156,255,.35)}
 .pill.gold{background:rgba(255,176,32,.12);color:var(--coin);border-color:rgba(255,176,32,.35)}
@@ -124,7 +125,7 @@ button.chip{font-family:var(--font);cursor:pointer}
 .chatbox{display:flex;flex-direction:column;gap:8px;padding:6px 0}
 .msg{max-width:78%;padding:10px 13px;border-radius:16px;font-size:15px;line-height:1.45;animation:fade .2s}
 .msg.them{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:6px;align-self:flex-start}
-.msg.me{background:rgba(182,255,59,.14);border:1px solid rgba(182,255,59,.35);border-bottom-right-radius:6px;align-self:flex-end}
+.msg.me{background:var(--brand-soft);border:1px solid var(--brand-border);border-bottom-right-radius:6px;align-self:flex-end}
 .msg .who{font-size:12px;font-weight:700;color:var(--brand);margin-bottom:3px}
 .msg .meta{font-size:11px;color:var(--muted2);margin-top:4px;text-align:right}
 .composer{
@@ -184,6 +185,26 @@ button.chip{font-family:var(--font);cursor:pointer}
 .notif{border-left:3px solid var(--brand)}
 .toast{position:absolute;left:50%;bottom:110px;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--brand);color:var(--text);padding:10px 18px;border-radius:999px;font-size:14px;font-weight:600;opacity:0;transition:all .3s;z-index:99;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* ===== LIGHT MODE ===== */
+body.light{--bg:#F6F4EE;--surface:#FFFFFF;--surface2:#ECE8DC;--border:#DCD5C2;
+  --text:#1B2029;--muted:#5B6572;--muted2:#8B94A1;
+  --brand:#4E9A00;--brand-deep:#3E7C00;--on-brand:#FFFFFF;--warm:#B07A1F;
+  --brand-soft:rgba(78,154,0,.10);--brand-border:rgba(78,154,0,.38);
+  --coin:#B97A0B;--xp:#3B5FE0;--live:#E11D48;--ok:#15803D;--warn:#B45309;--err:#DC2626}
+body.light{background:#E7E1D2}
+body.light .tabbar{background:rgba(255,255,255,.96)}
+body.light .appbar{background:linear-gradient(180deg,rgba(246,244,238,.98),rgba(246,244,238,.85))}
+body.light .modal{background:rgba(27,32,41,.45)}
+body.light .tree-wrap{background:radial-gradient(circle at 50% 0%,#FFFFFF,var(--bg) 75%)}
+body.light .card.hero{background:linear-gradient(135deg,#FFFFFF,#F1EDE2);border-color:#D8D0BC}
+body.light .card.hero::after{border-color:rgba(78,154,0,.08)}
+body.light .glow-btn{box-shadow:0 4px 16px rgba(78,154,0,.25)}
+body.light .sendbtn{box-shadow:0 4px 14px rgba(78,154,0,.30)}
+body.light .msg.them{background:#FFFFFF}
+.switch{width:56px;height:32px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);position:relative;cursor:pointer;transition:background .2s;flex:none}
+.switch .knob{position:absolute;top:3px;left:4px;width:24px;height:24px;border-radius:50%;background:var(--muted2);transition:left .2s,background .2s}
+.switch.on{background:var(--brand-soft);border-color:var(--brand)}
+.switch.on .knob{left:26px;background:var(--brand)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -338,6 +359,10 @@ button.chip{font-family:var(--font);cursor:pointer}
     <div class="kv"><span class="k">Đăng nhập bằng passkey</span><span class="v" style="color:var(--brand)">Đã bật ✓</span></div>
     <div class="kv"><span class="k">Xác thực 2 bước (OTP)</span><span class="v" style="color:var(--brand)">Đã bật ✓</span></div>
     <div class="kv"><span class="k">Thiết bị đăng nhập</span><span class="v num">2 thiết bị</span></div>
+  </div>
+  <div class="sec-title">Giao diện</div>
+  <div class="card" style="padding:6px 14px">
+    <div class="kv"><span class="k">Chế độ sáng <span style="font-size:12px;color:var(--muted2)">(dễ đọc ban ngày)</span></span><button class="switch" id="themeSwitch" onclick="toggleTheme()" aria-label="Chuyển chế độ sáng tối"><span class="knob"></span></button></div>
   </div>
   <div style="text-align:center;margin:18px 0 6px;color:var(--muted2);font-size:13px">HỌ NHÀ TÔI · Phiên bản prototype 1.0</div>
 </section>
@@ -562,6 +587,14 @@ $('#myGroups').innerHTML=GROUPS.map(g=>`
     <div class="grow"><div class="t1">${g.name}</div><div class="t2">${g.sub}</div></div>
   </div>`).join('');
 
+/* ===== LIGHT MODE ===== */
+function toggleTheme(){
+  const light=document.body.classList.toggle('light');
+  document.getElementById('themeSwitch').classList.toggle('on',light);
+  try{localStorage.setItem('hnt-theme',light?'light':'dark')}catch(e){}
+  toast(light?'Đã bật chế độ sáng':'Đã bật chế độ tối');
+}
+try{if(localStorage.getItem('hnt-theme')==='light'){document.body.classList.add('light');document.getElementById('themeSwitch').classList.add('on')}}catch(e){}
 drawTree();
 </script>
 </div>
