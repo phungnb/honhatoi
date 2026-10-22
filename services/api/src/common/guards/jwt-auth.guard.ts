@@ -1,17 +1,29 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UserStatus } from '@prisma/client';
+import { jwtSecret } from '../../auth/jwt-secret';
 
 /**
- * JwtAuthGuard (khung).
- * TODO: triển khai xác thực JWT thật —
- *   - đọc header `Authorization: Bearer <access_token>`
- *   - verify bằng @nestjs/jwt với JWT_SECRET (thuật toán RS256 ở production)
- *   - kiểm tra user.status != 'suspended'/'deleted'
- *   - gắn payload đã verify vào request.user = { sub, sessionId, scope }
- * Hiện tại guard này chỉ kiểm tra sự tồn tại của header để khung API chạy được.
+ * JwtAuthGuard — xác thực JWT thật.
+ *  - đọc header `Authorization: Bearer <access_token>`
+ *  - verify chữ ký + hạn bằng JWT_SECRET
+ *  - kiểm tra user.status == ACTIVE
+ *  - kiểm tra session chưa bị thu hồi / hết hạn
+ *  - gắn payload vào request.user = { sub, sessionId, scope }
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  private readonly jwt = new JwtService({ secret: jwtSecret() });
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const auth = req.headers?.authorization as string | undefined;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -20,8 +32,42 @@ export class JwtAuthGuard implements CanActivate {
         message: 'Thiếu hoặc sai định dạng Authorization header',
       });
     }
-    // TODO: thay bằng JwtService.verifyAsync(auth.slice(7))
-    req.user = { sub: 'todo-user-id', sessionId: 'todo-session-id', scope: 'app' };
+    let payload: { sub: string; sessionId?: string; scope?: string };
+    try {
+      payload = await this.jwt.verifyAsync(auth.slice(7));
+    } catch {
+      throw new UnauthorizedException({
+        code: 'INVALID_TOKEN',
+        message: 'Token không hợp lệ hoặc đã hết hạn',
+      });
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, status: true },
+    });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Tài khoản không còn hiệu lực',
+      });
+    }
+    if (payload.sessionId) {
+      const session = await this.prisma.userSession.findUnique({
+        where: { id: payload.sessionId },
+        select: { revokedAt: true, expiresAt: true },
+      });
+      if (!session || session.revokedAt || session.expiresAt < new Date()) {
+        throw new UnauthorizedException({
+          code: 'SESSION_REVOKED',
+          message: 'Phiên đăng nhập đã bị thu hồi — vui lòng đăng nhập lại',
+        });
+      }
+    }
+    req.user = {
+      sub: payload.sub,
+      sessionId: payload.sessionId,
+      scope: payload.scope ?? 'app',
+    };
     return true;
   }
 }

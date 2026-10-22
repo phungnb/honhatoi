@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -35,5 +35,11 @@ export class AuthController {
   @HttpCode(200)
   logout(@CurrentUserId() userId: string, @Body() body: { sessionId: string }) {
     return this.auth.logout(userId, body.sessionId);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUserId() userId: string) {
+    return this.auth.me(userId);
   }
 }
