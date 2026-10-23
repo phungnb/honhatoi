@@ -1,1 +1,1 @@
-{"buildCommand": "npx prisma generate && npm run build && npx prisma db push --accept-data-loss --skip-generate", "rewrites": [{"source": "/api/v1/(.*)", "destination": "/api/$1"}], "installCommand": "npm install --include=dev"}
+{"buildCommand": "npx prisma generate && npm run build && npx prisma db push --accept-data-loss --skip-generate", "installCommand": "npm install --include=dev"}
