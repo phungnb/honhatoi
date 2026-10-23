@@ -1,1 +1,1 @@
-{"buildCommand": "echo \"build test - skip prisma\"", "rewrites": [{"destination": "/api", "source": "/api/v1/(.*)"}], "framework": "nestjs"}
+{"buildCommand": "prisma generate && npm run build", "rewrites": [{"destination": "/api", "source": "/api/v1/(.*)"}], "installCommand": "npm install --include=dev"}
