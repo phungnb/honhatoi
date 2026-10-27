@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/duyet-xac-minh", label: "Duyệt xác minh gia phả" },
   { href: "/dong-ho", label: "Dòng họ" },
   { href: "/thanh-vien", label: "Thành viên" },
+  { href: "/dang-nhap", label: "Đăng nhập" },
   { href: "/nhat-ky", label: "Nhật ký kiểm toán" },
   { href: "/cai-dat", label: "Cài đặt" },
 ];
@@ -45,9 +46,8 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-foot">
-        Phiên bản 0.1.0 — khung giao diện
-        <br />
-        Dữ liệu mẫu, chưa nối backend
+        Phiên bản 0.2.0 — trang Duyệt xác minh đã nối backend thật;
+        các trang khác vẫn dùng dữ liệu mẫu.
       </div>
     </aside>
   );
