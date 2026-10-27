@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Prisma, VerificationStatus } from '@prisma/client';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -56,7 +57,10 @@ const NO_PERM: Perm = {
 
 @Injectable()
 export class GenealogyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   // ---------------------------------------------------------------- helpers
 
@@ -794,7 +798,11 @@ export class GenealogyService {
    * POST /genealogy/proposals/:id/approve — áp dụng payload trong transaction
    * + ghi audit log. Không được tự duyệt đề xuất của chính mình (trừ canManage).
    */
-  async approveProposal(proposalId: string, reviewerId: string) {
+  async approveProposal(
+    proposalId: string,
+    reviewerId: string,
+    note?: string,
+  ) {
     const proposal = await this.getPendingProposalOrThrow(proposalId);
     const perm = await this.effectivePerm(proposal.lineageId, reviewerId);
     this.require(perm, 'canVerify', 'duyệt đề xuất');
@@ -974,6 +982,7 @@ export class GenealogyService {
           status: 'approved',
           reviewedBy: reviewerId,
           reviewedAt: new Date(),
+          reviewNote: note ?? null,
         },
       });
       await this.audit(
@@ -988,14 +997,78 @@ export class GenealogyService {
       return { updated, applied };
     });
 
+    // Vòng kín sau khi duyệt: báo cho toàn bộ thành viên của họ.
+    // Lỗi gửi thông báo không làm hỏng kết quả duyệt.
+    await this.notifyApproval(proposal, reviewerId);
+
     return {
       data: { change_request: result.updated, applied: result.applied },
       error: null,
     };
   }
 
+  /**
+   * Thông báo cho mọi thành viên đã duyệt của dòng họ khi một đề xuất được
+   * duyệt (chu trình khép kín Luồng 3 → Luồng 2 → Luồng 3 theo đánh giá
+   * chuyên gia 27/10/2026). Người duyệt không tự nhận thông báo này.
+   */
+  private async notifyApproval(
+    proposal: {
+      id: string;
+      lineageId: string;
+      requestType: string;
+      personId?: string | null;
+      payload?: unknown;
+    },
+    reviewerId: string,
+  ): Promise<void> {
+    try {
+      const members = await this.prisma.lineageMembership.findMany({
+        where: { lineageId: proposal.lineageId, status: 'approved' },
+        select: { userId: true },
+      });
+      const payload = (proposal.payload ?? {}) as Record<string, unknown>;
+      const after = (payload['after'] ?? {}) as Record<string, unknown>;
+      const before = (payload['before'] ?? {}) as Record<string, unknown>;
+      const name =
+        (after['fullName'] as string | undefined) ??
+        (before['fullName'] as string | undefined) ??
+        'một hồ sơ gia phả';
+      const typeLabel: Record<string, string> = {
+        create_person: 'thêm thành viên',
+        update_person: 'cập nhật hồ sơ',
+        delete_person: 'xóa thành viên',
+        create_relationship: 'thêm quan hệ',
+        delete_relationship: 'xóa quan hệ',
+      };
+      const items = members
+        .map((m) => m.userId)
+        .filter((id) => id !== reviewerId)
+        .map((userId) => ({
+          userId,
+          type: 'genealogy_approved',
+          title: 'Gia phả đã cập nhật',
+          body: `Đề xuất ${typeLabel[proposal.requestType] ?? proposal.requestType} cho ${name} đã được duyệt.`,
+          data: {
+            proposalId: proposal.id,
+            lineageId: proposal.lineageId,
+            requestType: proposal.requestType,
+            personId: proposal.personId ?? null,
+          },
+          dedupKey: `genealogy-approved:${proposal.id}:user:${userId}`,
+        }));
+      await this.notifications.notifyMany(items);
+    } catch {
+      // Bỏ qua lỗi thông báo — kết quả duyệt vẫn giữ nguyên.
+    }
+  }
+
   /** POST /genealogy/proposals/:id/reject — từ chối + hoàn trạng thái person. */
-  async rejectProposal(proposalId: string, reviewerId: string) {
+  async rejectProposal(
+    proposalId: string,
+    reviewerId: string,
+    note?: string,
+  ) {
     const proposal = await this.getPendingProposalOrThrow(proposalId);
     const perm = await this.effectivePerm(proposal.lineageId, reviewerId);
     this.require(perm, 'canVerify', 'duyệt đề xuất');
@@ -1007,6 +1080,7 @@ export class GenealogyService {
           status: 'rejected',
           reviewedBy: reviewerId,
           reviewedAt: new Date(),
+          reviewNote: note ?? null,
         },
       });
       if (

@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { GenealogyController } from './genealogy.controller';
 import { GenealogyService } from './genealogy.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [GenealogyController],
   providers: [GenealogyService],
   exports: [GenealogyService],

@@ -16,6 +16,7 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { CreateRelationshipDto } from './dto/create-relationship.dto';
 import { CreateProposalDto } from './dto/create-proposal.dto';
+import { ReviewProposalDto } from './dto/review-proposal.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { LineageGuard } from '../common/guards/lineage.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
@@ -166,13 +167,21 @@ export class GenealogyController {
   }
 
   @Post('proposals/:id/approve')
-  approveProposal(@Param('id') id: string, @CurrentUserId() reviewerId: string) {
-    return this.genealogy.approveProposal(id, reviewerId);
+  approveProposal(
+    @Param('id') id: string,
+    @CurrentUserId() reviewerId: string,
+    @Body() dto: ReviewProposalDto,
+  ) {
+    return this.genealogy.approveProposal(id, reviewerId, dto?.note);
   }
 
   @Post('proposals/:id/reject')
-  rejectProposal(@Param('id') id: string, @CurrentUserId() reviewerId: string) {
-    return this.genealogy.rejectProposal(id, reviewerId);
+  rejectProposal(
+    @Param('id') id: string,
+    @CurrentUserId() reviewerId: string,
+    @Body() dto: ReviewProposalDto,
+  ) {
+    return this.genealogy.rejectProposal(id, reviewerId, dto?.note);
   }
 
   @Post('proposals/:id/dispute')

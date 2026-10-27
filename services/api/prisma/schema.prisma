@@ -386,6 +386,7 @@ model GenealogyChangeRequest {
   requestType    String             @map("request_type") @db.VarChar(30)
   payload        Json
   reason         String?            @db.Text
+  reviewNote     String?            @map("review_note") @db.Text
   status         String             @default("pending") @db.VarChar(20)
   requestedBy    String             @map("requested_by") @db.Uuid
   requester      User               @relation("ChangeRequester", fields: [requestedBy], references: [id], onDelete: SetNull)
