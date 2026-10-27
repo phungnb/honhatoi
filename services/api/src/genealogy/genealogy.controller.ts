@@ -183,6 +183,39 @@ export class GenealogyController {
     return this.genealogy.kinship(lineageId, userId, from, to);
   }
 
+  /// GET /genealogy/lunar/convert?date=YYYY-MM-DD — đổi dương sang âm
+  /// lịch Việt Nam (phổ quát, không gắn dòng họ, chỉ cần đăng nhập).
+  @Get('lunar/convert')
+  convertLunar(@Query('date') date?: string) {
+    if (!date)
+      throw new BadRequestException({
+        code: 'MISSING_QUERY',
+        message: 'Cần tham số date dạng YYYY-MM-DD',
+      });
+    return this.genealogy.convertSolarToLunar(date);
+  }
+
+  /// GET /genealogy/lineages/:lineageId/anniversaries — ngày giỗ sắp tới
+  /// của dòng họ (tuần 3 theo đánh giá chuyên gia). ?limit (mặc định 20,
+  /// tối đa 100), ?days (chỉ lấy giỗ trong N ngày tới).
+  @Get('lineages/:lineageId/anniversaries')
+  @UseGuards(LineageGuard)
+  anniversaries(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Query('limit') limit?: string,
+    @Query('days') days?: string,
+  ) {
+    const n = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 100);
+    const d = days === undefined ? undefined : parseInt(days, 10);
+    return this.genealogy.anniversaries(
+      lineageId,
+      userId,
+      n,
+      Number.isFinite(d) ? d : undefined,
+    );
+  }
+
   @Post('proposals/:id/approve')
   approveProposal(
     @Param('id') id: string,

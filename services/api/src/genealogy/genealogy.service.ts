@@ -8,6 +8,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { findKinship } from './kinship';
+import {
+  formatLunar,
+  nextAnniversary,
+  solarStrToLunar,
+  solarToLunar,
+  todayVn,
+  toVnDateString,
+} from './lunar';
 import { Prisma, VerificationStatus } from '@prisma/client';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -1436,6 +1444,86 @@ export class GenealogyService {
     return {
       json: JSON.stringify(backup, null, 2),
       filename: 'gia-pha-backup.json',
+    };
+  }
+
+  /**
+   * Đổi một ngày dương sang âm lịch Việt Nam (không cần dòng họ — phép
+   * đổi lịch là phổ quát, chỉ cần đăng nhập).
+   */
+  convertSolarToLunar(date: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+      throw new BadRequestException({
+        code: 'INVALID_DATE',
+        message: 'Tham số date phải có dạng YYYY-MM-DD',
+      });
+    const [y, m, d] = date.split('-').map(Number);
+    const lunar = solarToLunar(y, m, d);
+    return {
+      data: {
+        solar: date,
+        lunar: { ...lunar, display: formatLunar(lunar) },
+      },
+      error: null,
+    };
+  }
+
+  /**
+   * Ngày giỗ sắp tới của dòng họ (tuần 3 theo đánh giá chuyên gia).
+   * Với mỗi người đã mất: lấy ngày mất (dương) → đổi sang âm → tính lần
+   * giỗ tới gần nhất theo giờ Việt Nam. Chỉ người có canView mới xem
+   * được; dữ liệu vẫn cô lập theo lineage như mọi endpoint khác.
+   */
+  async anniversaries(
+    lineageId: string,
+    userId: string,
+    limit: number,
+    withinDays?: number,
+  ) {
+    const perm = await this.effectivePerm(lineageId, userId);
+    this.require(perm, 'canView', 'xem ngày giỗ');
+    const today = todayVn();
+    const deceased = await this.prisma.familyPerson.findMany({
+      where: {
+        lineageId,
+        deletedAt: null,
+        dateOfDeath: { not: null },
+      },
+      select: {
+        id: true,
+        fullName: true,
+        dateOfDeath: true,
+        burialPlace: true,
+      },
+      orderBy: { fullName: 'asc' },
+      take: 200,
+    });
+    const rows = [];
+    for (const p of deceased) {
+      if (!p.dateOfDeath) continue;
+      const deathSolar = toVnDateString(p.dateOfDeath);
+      const deathLunar = solarStrToLunar(deathSolar);
+      const next = nextAnniversary(deathLunar, today);
+      if (!next) continue;
+      if (withinDays !== undefined && next.daysUntil > withinDays) continue;
+      rows.push({
+        personId: p.id,
+        fullName: p.fullName,
+        burialPlace: p.burialPlace,
+        deathSolar,
+        deathLunar: formatLunar(deathLunar),
+        nextSolar: next.solar,
+        daysUntil: next.daysUntil,
+      });
+    }
+    rows.sort(
+      (a, b) =>
+        a.nextSolar.localeCompare(b.nextSolar) ||
+        a.fullName.localeCompare(b.fullName),
+    );
+    return {
+      data: { today, anniversaries: rows.slice(0, limit) },
+      error: null,
     };
   }
 }

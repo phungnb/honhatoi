@@ -40,6 +40,20 @@ interface KinshipResult {
   note: string | null;
 }
 
+interface Anniversary {
+  personId: string;
+  fullName: string;
+  burialPlace?: string | null;
+  deathLunar: string;
+  nextSolar: string;
+  daysUntil: number;
+}
+
+function fmtSolar(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 function yearOf(iso?: string | null): string {
   if (!iso) return "";
   const m = /^(\d{4})/.exec(iso);
@@ -55,6 +69,7 @@ export default function AppHomePage() {
   const [toId, setToId] = useState("");
   const [kinship, setKinship] = useState<KinshipResult | null>(null);
   const [kinshipBusy, setKinshipBusy] = useState(false);
+  const [anniversaries, setAnniversaries] = useState<Anniversary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,6 +114,22 @@ export default function AppHomePage() {
   useEffect(() => {
     if (lineageId) void loadTree(lineageId);
   }, [lineageId, loadTree]);
+
+  useEffect(() => {
+    if (!lineageId) return;
+    (async () => {
+      try {
+        const body = await get<{
+          data?: { anniversaries?: Anniversary[] };
+        }>(
+          `/genealogy/lineages/${lineageId}/anniversaries?limit=5&days=60`,
+        );
+        setAnniversaries(body?.data?.anniversaries ?? []);
+      } catch {
+        setAnniversaries([]);
+      }
+    })();
+  }, [lineageId]);
 
   async function lookupKinship() {
     if (!fromId || !toId || !lineageId) return;
@@ -257,6 +288,45 @@ export default function AppHomePage() {
           </div>
         ))
       )}
+
+      <div className="card section-gap">
+        <h2 className="card-title">Giỗ sắp tới</h2>
+        <p className="muted-text">
+          Tính theo ngày âm lịch Việt Nam — ngày giỗ năm sau tự động dời
+          theo lịch âm, không cần nhớ ngày dương.
+        </p>
+        {anniversaries.length === 0 ? (
+          <p className="muted-text">Không có giỗ nào trong 60 ngày tới.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <tbody>
+                {anniversaries.map((a) => (
+                  <tr key={a.personId}>
+                    <td>
+                      <strong>{a.fullName}</strong>
+                      <span className="muted-text">
+                        {" "}
+                        — giỗ ngày {a.deathLunar} âm lịch
+                      </span>
+                    </td>
+                    <td>{fmtSolar(a.nextSolar)}</td>
+                    <td>
+                      <span
+                        className={`badge ${a.daysUntil === 0 ? "warm" : a.daysUntil <= 3 ? "brand" : ""}`}
+                      >
+                        {a.daysUntil === 0
+                          ? "Hôm nay"
+                          : `Còn ${a.daysUntil} ngày`}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="card section-gap">
         <h2 className="card-title">Tra vai vế xưng hô</h2>
