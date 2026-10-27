@@ -6,6 +6,7 @@ import { GenealogyModule } from './genealogy/genealogy.module';
 import { ChatModule } from './chat/chat.module';
 import { EventsModule } from './events/events.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ChatModule,
     EventsModule,
     NotificationsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

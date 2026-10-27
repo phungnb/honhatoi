@@ -11,10 +11,24 @@ const NAV_ITEMS = [
   { href: "/dang-nhap", label: "Đăng nhập" },
   { href: "/nhat-ky", label: "Nhật ký kiểm toán" },
   { href: "/cai-dat", label: "Cài đặt" },
+  { href: "/app", label: "Không gian con cháu" },
+  { href: "/super-admin", label: "Quản trị nền tảng" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+
+  // Hai luồng khác (con cháu, nền tảng) có không gian riêng, không dùng
+  // sidebar của cổng Trưởng tộc — nhưng vẫn cùng 1 domain, chung 1 lần
+  // đăng nhập (token dùng chung qua lib/api.ts).
+  if (
+    pathname === "/app" ||
+    pathname.startsWith("/app/") ||
+    pathname === "/super-admin" ||
+    pathname.startsWith("/super-admin/")
+  ) {
+    return null;
+  }
 
   return (
     <aside className="sidebar">
@@ -46,8 +60,9 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-foot">
-        Phiên bản 0.2.0 — trang Duyệt xác minh đã nối backend thật;
-        các trang khác vẫn dùng dữ liệu mẫu.
+        Phiên bản 0.3.0 — cấu trúc 1 domain: /app (con cháu),
+        /admin/[họ] (Trưởng tộc), /super-admin (nền tảng), chung 1 lần
+        đăng nhập.
       </div>
     </aside>
   );
