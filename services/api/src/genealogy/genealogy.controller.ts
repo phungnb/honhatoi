@@ -7,8 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { GenealogyService } from './genealogy.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -59,6 +61,29 @@ export class GenealogyController {
       generations: generations ? Number(generations) || 3 : undefined,
       branch,
     });
+  }
+
+  /// GET /genealogy/lineages/:lineageId/export — tải file Excel gia phả.
+  @Get('lineages/:lineageId/export')
+  @UseGuards(LineageGuard)
+  async exportLineage(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.genealogy.exportLineage(
+      lineageId,
+      userId,
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"`,
+    );
+    res.send(buffer);
   }
 
   @Get('persons/:id')

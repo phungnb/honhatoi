@@ -1096,4 +1096,170 @@ export class GenealogyService {
     });
     return { data: { history, next_cursor: null }, error: null };
   }
+
+  /**
+   * GET /genealogy/lineages/:lineageId/export — xuất toàn bộ gia phả
+   * của MỘT dòng họ ra file Excel (.xlsx).
+   *
+   * Cô lập dữ liệu (biên cứng của dự án): chỉ xuất đúng lineage mà
+   * user có quyền xem; lineageId lấy từ route và kiểm tra membership
+   * phía server, không tin client.
+   *
+   * 3 sheet: Thành viên, Quan hệ, Sự kiện sắp tới.
+   */
+  async exportLineage(
+    lineageId: string,
+    userId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const perm = await this.effectivePerm(lineageId, userId);
+    this.require(perm, 'canView', 'xuất gia phả');
+
+    const [lineage, persons, rels, events] = await Promise.all([
+      this.prisma.lineage.findUnique({ where: { id: lineageId } }),
+      this.prisma.familyPerson.findMany({
+        where: { lineageId, deletedAt: null },
+        orderBy: [{ generation: 'asc' }, { fullName: 'asc' }],
+      }),
+      this.prisma.familyRelationship.findMany({ where: { lineageId } }),
+      this.prisma.event.findMany({
+        where: { lineageId, startAt: { gte: new Date() } },
+        orderBy: { startAt: 'asc' },
+        take: 200,
+      }),
+    ]);
+    if (!lineage)
+      throw new NotFoundException({
+        code: 'LINEAGE_NOT_FOUND',
+        message: 'Không tìm thấy dòng họ',
+      });
+
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'HO-NHA-TOI';
+    workbook.created = new Date();
+
+    const fmtDate = (d: Date | null | undefined): string => {
+      if (!d) return '';
+      const dt = new Date(d);
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${dt.getFullYear()}`;
+    };
+    const relLabel = (t: string): string => {
+      switch (t) {
+        case 'parent':
+          return 'Cha/mẹ của';
+        case 'child':
+          return 'Con của';
+        case 'spouse':
+          return 'Vợ/chồng của';
+        case 'adoptive_parent':
+          return 'Cha/mẹ nuôi của';
+        case 'adoptive_child':
+          return 'Con nuôi của';
+        case 'ex_spouse':
+          return 'Vợ/chồng cũ của';
+        default:
+          return t;
+      }
+    };
+    const eventLabel = (t: string): string => {
+      switch (t) {
+        case 'ANCESTRAL_CEREMONY':
+        case 'ancestral_ceremony':
+          return 'Giỗ tổ';
+        case 'DEATH_ANNIVERSARY':
+        case 'death_anniversary':
+          return 'Ngày giỗ';
+        case 'BIRTHDAY':
+        case 'birthday':
+          return 'Sinh nhật';
+        case 'FAMILY_MEETING':
+        case 'family_meeting':
+          return 'Họp họ';
+        case 'GATHERING':
+        case 'gathering':
+          return 'Gặp mặt';
+        default:
+          return 'Sự kiện';
+      }
+    };
+
+    // Sheet 1: Thành viên
+    const members = workbook.addWorksheet('Thành viên');
+    members.columns = [
+      { header: 'Họ tên', key: 'fullName', width: 28 },
+      { header: 'Tên gọi', key: 'nickname', width: 16 },
+      { header: 'Giới tính', key: 'gender', width: 12 },
+      { header: 'Ngày sinh', key: 'dob', width: 14 },
+      { header: 'Ngày mất', key: 'dod', width: 14 },
+      { header: 'Trạng thái', key: 'status', width: 14 },
+      { header: 'Quê quán', key: 'hometown', width: 22 },
+      { header: 'Phần mộ', key: 'burialPlace', width: 26 },
+      { header: 'Chi', key: 'branch', width: 14 },
+      { header: 'Đời', key: 'generation', width: 8 },
+      { header: 'Ghi chú', key: 'bio', width: 40 },
+    ];
+    for (const p of persons) {
+      members.addRow({
+        fullName: p.fullName,
+        nickname: p.nickname ?? '',
+        gender:
+          p.gender === 'male'
+            ? 'Nam'
+            : p.gender === 'female'
+              ? 'Nữ'
+              : '',
+        dob: p.birthYearOnly && p.dateOfBirth
+          ? `Năm ${new Date(p.dateOfBirth as Date).getFullYear()}`
+          : fmtDate(p.dateOfBirth as Date | null),
+        dod: fmtDate(p.dateOfDeath as Date | null),
+        status: p.dateOfDeath ? 'Đã mất' : 'Đang sống',
+        hometown: p.hometown ?? '',
+        burialPlace: p.burialPlace ?? '',
+        branch: p.branch ?? '',
+        generation: p.generation ?? '',
+        bio: p.bio ?? '',
+      });
+    }
+
+    // Sheet 2: Quan hệ
+    const byId = new Map(persons.map((p) => [p.id, p.fullName]));
+    const relations = workbook.addWorksheet('Quan hệ');
+    relations.columns = [
+      { header: 'Người', key: 'from', width: 28 },
+      { header: 'Quan hệ', key: 'type', width: 18 },
+      { header: 'Người liên quan', key: 'to', width: 28 },
+    ];
+    for (const r of rels) {
+      const from = byId.get(r.personId);
+      const to = byId.get(r.relatedPersonId);
+      if (!from || !to) continue;
+      relations.addRow({
+        from,
+        type: relLabel(r.relationshipType),
+        to,
+      });
+    }
+
+    // Sheet 3: Sự kiện sắp tới
+    const upcoming = workbook.addWorksheet('Sự kiện sắp tới');
+    upcoming.columns = [
+      { header: 'Tiêu đề', key: 'title', width: 32 },
+      { header: 'Loại', key: 'type', width: 16 },
+      { header: 'Ngày', key: 'date', width: 14 },
+      { header: 'Địa điểm', key: 'location', width: 26 },
+    ];
+    for (const e of events) {
+      upcoming.addRow({
+        title: e.title,
+        type: eventLabel(e.eventType as string),
+        date: fmtDate(e.startAt),
+        location: e.location ?? '',
+      });
+    }
+
+    const buffer = (await workbook.xlsx.writeBuffer()) as Buffer;
+    return { buffer, filename: 'gia-pha.xlsx' };
+  }
 }
