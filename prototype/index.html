@@ -162,6 +162,24 @@ body.light .glow-btn{box-shadow:0 4px 16px rgba(78,154,0,.25)}
 body.light .sendbtn{box-shadow:0 4px 14px rgba(78,154,0,.30)}
 body.light .msg.them{background:#FFFFFF}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* In cây gia phả: chỉ in tab cây, nền trắng tiết kiệm mực, khổ ngang A4.
+   Chế độ cây: hàm printTree() đã reset zoom và mở rộng khung vừa nội dung
+   trước khi gọi window.print(); chế độ danh sách in thẳng danh sách. */
+@page{size:landscape;margin:12mm}
+@media print{
+  body{display:block;background:#fff!important;color:#111}
+  .phone{max-width:none;height:auto!important;max-height:none;overflow:visible;border:none!important;border-radius:0!important;box-shadow:none!important}
+  .screen{display:none!important}
+  #s-tree{display:block!important;overflow:visible;padding:0}
+  #tree-modes,.tree-ctrl,#s-tree .card,.tabbar,.modal{display:none!important}
+  .tree-wrap{overflow:visible;border:none!important;background:#fff!important}
+  .tree-inner{transition:none}
+  .tnode .nm{color:#111}
+  .tnode .gen{color:#2a6e00!important}
+  .tnode .st{color:#555!important}
+  .tnode .face{background:#fff!important;color:#111!important}
+  #treeLinks line{stroke:#999!important}
+}
 </style>
 </head>
 <body>
@@ -181,6 +199,7 @@ body.light .msg.them{background:#FFFFFF}
     <button class="chip on" data-mode="v">Cây dọc</button>
     <button class="chip" data-mode="h">Cây ngang</button>
     <button class="chip" data-mode="list">Danh sách</button>
+    <button class="chip" onclick="printTree()">🖨 In cây</button>
   </div>
   <div class="tree-wrap" id="treeWrap">
     <div class="tree-inner" id="treeInner"><svg id="treeLinks" style="position:absolute;overflow:visible"></svg></div>
@@ -470,6 +489,25 @@ function drawTree(){
 function applyTree(){ $('#treeInner').style.transform=`translate(${treeTX}px,${treeTY}px) scale(${treeScale})`; }
 function treeZoom(f){ treeScale=Math.min(2.2,Math.max(.4,treeScale*f)); applyTree(); }
 function treeReset(){ treeScale=1;treeTX=0;treeTY=0;applyTree(); }
+/* In cây: danh sách thì in thẳng; cây thì reset zoom/pan, co vừa khổ
+   ngang A4 (tối đa 1050px) rồi in, sau đó khôi phục trạng thái cũ. */
+function printTree(){
+  if(treeMode==='list'){ window.print(); return; }
+  const wrap=$('#treeWrap');
+  const saved={s:treeScale,x:treeTX,y:treeTY};
+  const horiz=treeMode==='h';
+  const P=id=>{ const [x,y]=L.pos[id]; return horiz?[y*1.35,x*0.9+40]:[x+380,y+40]; };
+  const xs=L.people.map(p=>P(p.id)[0]), ys=L.people.map(p=>P(p.id)[1]);
+  const minX=Math.min(...xs), maxX=Math.max(...xs);
+  const minY=Math.min(...ys), maxY=Math.max(...ys);
+  const contentW=maxX-minX+104, contentH=maxY-minY+110;
+  const scale=Math.min(1,1050/contentW);
+  treeScale=scale; treeTX=-minX*scale; treeTY=-minY*scale; applyTree();
+  wrap.style.height=(contentH*scale+20)+'px';
+  const restore=()=>{ treeScale=saved.s; treeTX=saved.x; treeTY=saved.y; applyTree(); wrap.style.height=''; window.removeEventListener('afterprint',restore); };
+  window.addEventListener('afterprint',restore);
+  window.print();
+}
 (function(){
   const wrap=()=> $('#treeWrap'); let drag=null;
   document.addEventListener('pointerdown',e=>{ const w=wrap(); if(w&&w.contains(e.target)&&treeMode!=='list') drag={x:e.clientX-treeTX,y:e.clientY-treeTY}; });
