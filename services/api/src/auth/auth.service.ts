@@ -70,6 +70,25 @@ export class AuthService {
 
   /** POST /auth/otp/verify — đổi OTP lấy cặp access + refresh token. */
   async verifyOtp(dto: VerifyOtpDto) {
+    // Mã test nội bộ (phương án A, Ba duyệt 24/10): chỉ có tác dụng khi
+    // CẢ 2 biến môi trường đều được đặt, và chỉ đúng 1 số điện thoại.
+    // Xóa 1 trong 2 biến là đóng lại ngay, không cần sửa code.
+    // Đặt trước bước tra mã thật để Ba không cần nhận SMS.
+    const testPhone = process.env.TEST_PHONE;
+    const testCode = process.env.TEST_OTP_CODE;
+    if (
+      testPhone &&
+      testCode &&
+      dto.phone === testPhone &&
+      dto.code === testCode
+    ) {
+      return this.loginByPhone(
+        dto.phone,
+        dto.deviceName,
+        dto.devicePlatform,
+      );
+    }
+
     const record = await this.prisma.phoneOtpCode.findFirst({
       where: {
         phone: dto.phone,
@@ -105,8 +124,24 @@ export class AuthService {
       data: { consumedAt: new Date() },
     });
 
+    return this.loginByPhone(
+      dto.phone,
+      dto.deviceName,
+      dto.devicePlatform,
+    );
+  }
+
+  /**
+   * Tìm user theo số điện thoại (tạo mới nếu chưa có) rồi cấp phiên.
+   * Dùng chung cho cả luồng OTP thật và mã test nội bộ.
+   */
+  private async loginByPhone(
+    phone: string,
+    deviceName?: string,
+    devicePlatform?: string,
+  ) {
     let user = await this.prisma.user.findUnique({
-      where: { phone: dto.phone },
+      where: { phone },
     });
     if (user) {
       if (user.status !== UserStatus.ACTIVE)
@@ -118,7 +153,7 @@ export class AuthService {
       // Đăng ký ngầm lần đầu: tạo user + hồ sơ tối thiểu trong transaction.
       user = await this.prisma.$transaction(async (tx) => {
         const u = await tx.user.create({
-          data: { phone: dto.phone, displayName: 'Thành viên mới' },
+          data: { phone, displayName: 'Thành viên mới' },
         });
         await tx.memberProfile.create({
           data: { userId: u.id, fullName: 'Thành viên mới' },
@@ -126,7 +161,7 @@ export class AuthService {
         return u;
       });
     }
-    return this.issueSession(user.id, dto.deviceName, dto.devicePlatform);
+    return this.issueSession(user.id, deviceName, devicePlatform);
   }
 
   /** Tạo phiên mới: access JWT (15') + refresh token (30 ngày, lưu hash). */
