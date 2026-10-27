@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { findKinship } from './kinship';
 import { Prisma, VerificationStatus } from '@prisma/client';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -1152,6 +1153,56 @@ export class GenealogyService {
       return pr;
     });
     return { data: { change_request: updated }, error: null };
+  }
+
+  /**
+   * GET /genealogy/lineages/:id/kinship?from=&to= — suy luận danh xưng
+   * vai vế (tuần 3 theo đánh giá chuyên gia 27/10/2026: "Người này là
+   * Chú họ của bạn"). Logic nằm ở kinship.ts (hàm thuần, đã kiểm thử
+   * 29 trường hợp: nội/ngoại, anh/chị/em, dâu/rể, mẹ kế, thiếu năm sinh).
+   */
+  async kinship(
+    lineageId: string,
+    userId: string,
+    fromId: string,
+    toId: string,
+  ) {
+    const perm = await this.effectivePerm(lineageId, userId);
+    this.require(perm, 'canView', 'xem danh xưng vai vế');
+    const persons = await this.prisma.familyPerson.findMany({
+      where: { lineageId, deletedAt: null },
+      select: {
+        id: true,
+        fullName: true,
+        gender: true,
+        dateOfBirth: true,
+      },
+    });
+    const relations = await this.prisma.familyRelationship.findMany({
+      where: { lineageId },
+      select: {
+        personId: true,
+        relatedPersonId: true,
+        relationshipType: true,
+      },
+    });
+    const result = findKinship(
+      fromId,
+      toId,
+      persons.map((p) => ({
+        id: p.id,
+        fullName: p.fullName,
+        gender: p.gender,
+        dateOfBirth: p.dateOfBirth ? p.dateOfBirth.toISOString() : null,
+      })),
+      relations,
+    );
+    if (!result)
+      throw new NotFoundException({
+        code: 'PERSON_NOT_FOUND',
+        message: 'Một trong hai người không thuộc dòng họ này',
+      });
+    return { data: result, error: null };
   }
 
   /** GET /genealogy/persons/:id/history — lịch sử từ các đề xuất đã duyệt (GP-09). */

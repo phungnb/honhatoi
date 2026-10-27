@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -164,6 +165,22 @@ export class GenealogyController {
     @Query('status') status?: string,
   ) {
     return this.genealogy.listProposals(lineageId, userId, status);
+  }
+
+  @Get('lineages/:lineageId/kinship')
+  @UseGuards(LineageGuard)
+  kinship(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!from || !to)
+      throw new BadRequestException({
+        code: 'MISSING_QUERY',
+        message: 'Cần đủ tham số from và to (id của hai người cần xem vai vế)',
+      });
+    return this.genealogy.kinship(lineageId, userId, from, to);
   }
 
   @Post('proposals/:id/approve')
