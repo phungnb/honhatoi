@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:ho_nha_toi/core/repositories/genealogy_repository.dart';
 import 'package:ho_nha_toi/core/repositories/lineage_repository.dart';
 import 'package:ho_nha_toi/core/widgets/async_view.dart';
 import 'package:ho_nha_toi/theme/app_theme.dart';
+import 'add_person_screen.dart';
 import 'family_tree_view.dart';
 import 'member_profile_sheet.dart';
 
@@ -56,9 +60,124 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
     });
   }
 
+  /// Mở hồ sơ thành viên kèm các hành động thêm/sửa/xóa.
+  ///
+  /// Sau khi thêm/sửa/xóa thành công thì tải lại cây.
+  Future<void> _openProfile(
+    String lineageId,
+    Map<String, dynamic> person,
+    List<String> parentIds,
+  ) async {
+    final treeKey = (lineageId: lineageId, generations: _generations);
+
+    Future<void> refreshTree() async {
+      ref.invalidate(genealogyTreeProvider(treeKey));
+    }
+
+    await showMemberProfileSheet(
+      context,
+      person,
+      onAddRelative: () async {
+        final changed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<void>(
+            builder: (_) => AddPersonScreen(
+              lineageId: lineageId,
+              anchorPerson: person,
+              anchorParentIds: parentIds,
+            ),
+          ),
+        );
+        if (changed == true) await refreshTree();
+      },
+      onEdit: () async {
+        final changed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<void>(
+            builder: (_) => AddPersonScreen(
+              lineageId: lineageId,
+              existingPerson: person,
+            ),
+          ),
+        );
+        if (changed == true) await refreshTree();
+      },
+      onDelete: () async {
+        try {
+          await ref
+              .read(genealogyRepositoryProvider)
+              .deletePerson(person['id'] as String);
+          await refreshTree();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Đã xóa hồ sơ.')),
+            );
+          }
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Xóa hồ sơ thất bại.')),
+            );
+          }
+        }
+      },
+    );
+  }
+
+  /// Thêm người mới không gắn quan hệ (độc lập trong họ).
+  Future<void> _addStandalone(String lineageId) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<void>(
+        builder: (_) => AddPersonScreen(lineageId: lineageId),
+      ),
+    );
+    if (changed == true) {
+      ref.invalidate(
+        genealogyTreeProvider(
+          (lineageId: lineageId, generations: _generations),
+        ),
+      );
+    }
+  }
+
+  /// Xuất gia phả ra Excel rồi mở hộp thoại chia sẻ/lưu file.
+  Future<void> _export(String lineageId, String lineageName) async {
+    try {
+      final bytes = await ref
+          .read(genealogyRepositoryProvider)
+          .exportLineage(lineageId);
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/gia-pha.xlsx');
+      await file.writeAsBytes(bytes);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Gia phả $lineageName',
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Xuất file thất bại. Thử lại.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final lineagesAsync = ref.watch(myLineagesProvider);
+    final loadedLineages = lineagesAsync.valueOrNull ?? const [];
+    // Họ đang xem: đã chọn thì giữ, chưa thì mặc định họ đầu tiên.
+    final effectiveLineageId = _selectedLineageId ??
+        (loadedLineages.isNotEmpty
+            ? loadedLineages.first['id'] as String
+            : null);
+    final effectiveLineageName = loadedLineages.isEmpty
+        ? null
+        : (loadedLineages
+                .firstWhere(
+                  (l) => l['id'] == effectiveLineageId,
+                  orElse: () => loadedLineages.first,
+                )['name'] as String?) ??
+            'Dòng họ';
 
     return Scaffold(
       appBar: AppBar(
@@ -66,9 +185,27 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
         backgroundColor: p.bg,
         foregroundColor: p.text,
         elevation: 0,
+        actions: [
+          if (effectiveLineageId != null)
+            IconButton(
+              icon: const Icon(Icons.download_outlined),
+              tooltip: 'Xuất Excel',
+              onPressed: () => _export(
+                effectiveLineageId,
+                effectiveLineageName ?? 'Dòng họ',
+              ),
+            ),
+        ],
       ),
+      floatingActionButton: effectiveLineageId == null
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _addStandalone(effectiveLineageId),
+              tooltip: 'Thêm người mới',
+              child: const Icon(Icons.person_add_outlined),
+            ),
       body: AsyncView<List<Map<String, dynamic>>>(
-        value: ref.watch(myLineagesProvider),
+        value: lineagesAsync,
         onRetry: () => ref.invalidate(myLineagesProvider),
         builder: (lineages) {
           if (lineages.isEmpty) {
@@ -85,8 +222,7 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
             );
           }
 
-          // Giữ họ đang chọn; mặc định họ đầu tiên.
-          final lineageId = _selectedLineageId ??=
+          final lineageId = effectiveLineageId ??
               lineages.first['id'] as String;
           final lineageName = lineages
                   .firstWhere(
@@ -151,8 +287,11 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
                 child: _debouncedQuery.isNotEmpty
                     ? _SearchResults(
                         future: _searchFuture,
-                        onTap: (person) =>
-                            showMemberProfileSheet(context, person),
+                        onTap: (person) => _openProfile(
+                          lineageId,
+                          person,
+                          const [],
+                        ),
                       )
                     : _TreeSection(
                         lineageId: lineageId,
@@ -160,8 +299,8 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
                         onLoadMore: () => setState(() {
                           if (_generations < 6) _generations++;
                         }),
-                        onPersonTap: (person) =>
-                            showMemberProfileSheet(context, person),
+                        onPersonTap: (person, parentIds) =>
+                            _openProfile(lineageId, person, parentIds),
                       ),
               ),
             ],
@@ -273,7 +412,11 @@ class _TreeSection extends ConsumerWidget {
   final String lineageId;
   final int generations;
   final VoidCallback onLoadMore;
-  final void Function(Map<String, dynamic> person) onPersonTap;
+
+  /// Chạm vào người + danh sách id cha/mẹ của người đó (để thêm
+  /// anh/chị/em qua cha/mẹ chung).
+  final void Function(Map<String, dynamic> person, List<String> parentIds)
+      onPersonTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -302,6 +445,18 @@ class _TreeSection extends ConsumerWidget {
                 .toList();
         final hasMore = tree['has_more'] == true;
 
+        // Id cha/mẹ của mỗi người (quan hệ parent/adoptive_parent mà
+        // người đó là relatedPersonId) — dùng để thêm anh/chị/em.
+        List<String> parentIdsOf(String personId) {
+          return relationships
+              .where((r) =>
+                  (r['relationshipType'] == 'parent' ||
+                      r['relationshipType'] == 'adoptive_parent') &&
+                  r['relatedPersonId'] == personId)
+              .map((r) => r['personId'] as String)
+              .toList();
+        }
+
         return Column(
           children: [
             Expanded(
@@ -311,7 +466,10 @@ class _TreeSection extends ConsumerWidget {
                   root: root,
                   persons: persons,
                   relationships: relationships,
-                  onPersonTap: onPersonTap,
+                  onPersonTap: (person) => onPersonTap(
+                    person,
+                    parentIdsOf(person['id'] as String),
+                  ),
                 ),
               ),
             ),

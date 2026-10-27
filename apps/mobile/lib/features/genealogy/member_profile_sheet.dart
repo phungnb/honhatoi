@@ -5,22 +5,39 @@ import 'package:ho_nha_toi/theme/app_theme.dart';
 ///
 /// Hiển thị trạng thái còn sống/đã mất, vị trí phần mộ (khi đã mất)
 /// và ghi chú — đúng yêu cầu hồ sơ thành viên của dự án.
+/// Các callback (nếu có) chạy sau khi sheet đã đóng.
 Future<void> showMemberProfileSheet(
   BuildContext context,
-  Map<String, dynamic> person,
-) {
+  Map<String, dynamic> person, {
+  VoidCallback? onAddRelative,
+  VoidCallback? onEdit,
+  VoidCallback? onDelete,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => _MemberProfileSheet(person: person),
+    builder: (context) => _MemberProfileSheet(
+      person: person,
+      onAddRelative: onAddRelative,
+      onEdit: onEdit,
+      onDelete: onDelete,
+    ),
   );
 }
 
 class _MemberProfileSheet extends StatelessWidget {
-  const _MemberProfileSheet({required this.person});
+  const _MemberProfileSheet({
+    required this.person,
+    this.onAddRelative,
+    this.onEdit,
+    this.onDelete,
+  });
 
   final Map<String, dynamic> person;
+  final VoidCallback? onAddRelative;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -229,6 +246,78 @@ class _MemberProfileSheet extends StatelessWidget {
                 ),
               ),
             ),
+            // Hành động: thêm người thân / sửa / xóa hồ sơ.
+            if (onAddRelative != null ||
+                onEdit != null ||
+                onDelete != null) ...[
+              const SizedBox(height: 20),
+              if (onAddRelative != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      onAddRelative!();
+                    },
+                    icon: const Icon(Icons.person_add_outlined),
+                    label: const Text('Thêm người thân'),
+                  ),
+                ),
+              if (onEdit != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      onEdit!();
+                    },
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Sửa hồ sơ'),
+                  ),
+                ),
+              ],
+              if (onDelete != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('Xóa hồ sơ?'),
+                          content: Text(
+                            'Hồ sơ của $name sẽ bị ẩn khỏi cây gia phả.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(false),
+                              child: const Text('Hủy'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(true),
+                              child: const Text('Xóa'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true && context.mounted) {
+                        Navigator.of(context).pop();
+                        onDelete!();
+                      }
+                    },
+                    icon: Icon(Icons.delete_outline, color: p.live),
+                    label: Text(
+                      'Xóa hồ sơ',
+                      style: TextStyle(color: p.live),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ],
         ),
       ),

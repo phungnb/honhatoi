@@ -39,6 +39,63 @@ class GenealogyRepository {
     final data = await _api.getData('GET', '/genealogy/persons/$personId');
     return data['person'] as Map<String, dynamic>;
   }
+
+  /// POST /genealogy/lineages/:id/persons — tạo người mới.
+  ///
+  /// Backend tự quyết: người có quyền sửa thì tạo thẳng (nháp),
+  /// người chỉ có quyền đề xuất thì tạo đề xuất chờ duyệt.
+  /// Trả về map `data`: chứa `person` khi tạo thẳng, `proposal`
+  /// khi tạo đề xuất.
+  Future<Map<String, dynamic>> createPerson(
+    String lineageId,
+    Map<String, dynamic> body,
+  ) async {
+    return _api.getData(
+      'POST',
+      '/genealogy/lineages/$lineageId/persons',
+      body: body,
+    );
+  }
+
+  /// PATCH /genealogy/persons/:id — sửa hồ sơ.
+  Future<Map<String, dynamic>> updatePerson(
+    String personId,
+    Map<String, dynamic> body,
+  ) async {
+    final data =
+        await _api.getData('PATCH', '/genealogy/persons/$personId', body: body);
+    return data['person'] as Map<String, dynamic>? ?? data;
+  }
+
+  /// DELETE /genealogy/persons/:id — xóa mềm hồ sơ.
+  Future<void> deletePerson(String personId) async {
+    await _api.getData('DELETE', '/genealogy/persons/$personId');
+  }
+
+  /// POST /genealogy/lineages/:id/relationships — tạo quan hệ hai chiều.
+  ///
+  /// Backend tự tạo quan hệ ngược (cha ↔ con, vợ ↔ chồng).
+  Future<void> createRelationship(
+    String lineageId,
+    String personId,
+    String relatedPersonId,
+    String relationshipType,
+  ) async {
+    await _api.getData(
+      'POST',
+      '/genealogy/lineages/$lineageId/relationships',
+      body: {
+        'personId': personId,
+        'relatedPersonId': relatedPersonId,
+        'relationshipType': relationshipType,
+      },
+    );
+  }
+
+  /// GET /genealogy/lineages/:id/export — tải file Excel gia phả.
+  Future<List<int>> exportLineage(String lineageId) async {
+    return _api.downloadBytes('/genealogy/lineages/$lineageId/export');
+  }
 }
 
 final genealogyRepositoryProvider = Provider<GenealogyRepository>(
