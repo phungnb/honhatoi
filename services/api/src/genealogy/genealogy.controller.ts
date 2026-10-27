@@ -86,6 +86,26 @@ export class GenealogyController {
     res.send(buffer);
   }
 
+  /// GET /genealogy/lineages/:lineageId/backup — tải file JSON sao lưu.
+  @Get('lineages/:lineageId/backup')
+  @UseGuards(LineageGuard)
+  async backupLineage(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Res() res: Response,
+  ) {
+    const { json, filename } = await this.genealogy.backupLineage(
+      lineageId,
+      userId,
+    );
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"`,
+    );
+    res.send(json);
+  }
+
   @Get('persons/:id')
   findPerson(@Param('id') id: string, @CurrentUserId() userId: string) {
     // LineageGuard không áp dụng ở đây (không có :lineageId);

@@ -31,6 +31,9 @@ class _TreeUnit {
 /// - Bề rộng mỗi nút = max(bề rộng bản thân, tổng bề rộng các nút con),
 ///   nên các nhánh không bao giờ chồng lên nhau.
 /// - Chạm vào một người → [onPersonTap] để mở hồ sơ.
+/// - [horizontal] = true: cây chạy từ trái sang phải (đời càng sâu
+///   càng sang phải), vợ chồng xếp chồng dọc — chỉ là hoán đổi tọa
+///   độ x/y của chế độ dọc nên đường nối vẫn khớp tâm vòng tròn.
 class FamilyTreeView extends StatelessWidget {
   const FamilyTreeView({
     super.key,
@@ -38,12 +41,16 @@ class FamilyTreeView extends StatelessWidget {
     required this.persons,
     required this.relationships,
     required this.onPersonTap,
+    this.horizontal = false,
   });
 
   final Map<String, dynamic>? root;
   final List<Map<String, dynamic>> persons;
   final List<Map<String, dynamic>> relationships;
   final void Function(Map<String, dynamic> person) onPersonTap;
+
+  /// Chế độ ngang (đời chảy từ trái sang phải).
+  final bool horizontal;
 
   /// Bề rộng một nút người (vòng tròn + tên bên dưới).
   static const double nodeWidth = 96;
@@ -78,8 +85,15 @@ class FamilyTreeView extends StatelessWidget {
     }
 
     final levelCount = layout.levels.length;
-    final canvasHeight = levelCount * levelHeight + 32;
-    final canvasWidth = layout.totalWidth;
+    // Chế độ dọc: rộng = tổng bề rộng, cao = số tầng × chiều cao tầng.
+    // Chế độ ngang: hoán đổi hai chiều (cộng thêm bề rộng nút vì nút
+    // chảy sang phải từ vị trí tầng).
+    final canvasWidth = horizontal
+        ? levelCount * levelHeight + nodeWidth + 32
+        : layout.totalWidth;
+    final canvasHeight = horizontal
+        ? layout.totalWidth
+        : levelCount * levelHeight + 32;
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
@@ -92,13 +106,17 @@ class FamilyTreeView extends StatelessWidget {
             children: [
               CustomPaint(
                 size: Size(canvasWidth, canvasHeight),
-                painter: _ConnectorPainter(layout, p),
+                painter: _ConnectorPainter(layout, p, horizontal),
               ),
               for (final unit in layout.units)
                 for (var i = 0; i < unit.members.length; i++)
                   Positioned(
-                    left: _nodeCenterX(unit, i) - nodeWidth / 2,
-                    top: unit.level * levelHeight + 16,
+                    left: horizontal
+                        ? unit.level * levelHeight + 16
+                        : _nodeCenterX(unit, i) - nodeWidth / 2,
+                    top: horizontal
+                        ? _nodeCenterX(unit, i) - nodeRadius
+                        : unit.level * levelHeight + 16,
                     width: nodeWidth,
                     child: _PersonNode(
                       person: unit.members[i],
@@ -260,12 +278,18 @@ class _Layout {
 }
 
 /// Vẽ đường nối: cặp vợ chồng nối ngang, cha/mẹ nối xuống các con
-/// qua một thanh ngang chung.
+/// qua một thanh ngang chung. Chế độ ngang chỉ hoán đổi x/y của mọi
+/// điểm nên hình học giữ nguyên.
 class _ConnectorPainter extends CustomPainter {
-  _ConnectorPainter(this.layout, this.p);
+  _ConnectorPainter(this.layout, this.p, this.horizontal);
 
   final _Layout layout;
   final AppPalette p;
+  final bool horizontal;
+
+  /// Điểm trong chế độ dọc → hoán đổi x/y khi ở chế độ ngang.
+  Offset _pt(double x, double y) =>
+      horizontal ? Offset(y, x) : Offset(x, y);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -288,8 +312,8 @@ class _ConnectorPainter extends CustomPainter {
       // Nối vợ chồng bằng đường ngang.
       if (unit.members.length == 2) {
         canvas.drawLine(
-          Offset(nodeCenterX(unit, 0), circleY),
-          Offset(nodeCenterX(unit, 1), circleY),
+          _pt(nodeCenterX(unit, 0), circleY),
+          _pt(nodeCenterX(unit, 1), circleY),
           linePaint,
         );
       }
@@ -301,16 +325,16 @@ class _ConnectorPainter extends CustomPainter {
           (FamilyTreeView.levelHeight - FamilyTreeView.nodeRadius * 2) / 2;
       final firstX = unit.children.first.centerX;
       final lastX = unit.children.last.centerX;
-      canvas.drawLine(Offset(unit.centerX, bottomY),
-          Offset(unit.centerX, midY), linePaint);
+      canvas.drawLine(_pt(unit.centerX, bottomY),
+          _pt(unit.centerX, midY), linePaint);
       if (unit.children.length > 1) {
-        canvas.drawLine(Offset(firstX, midY), Offset(lastX, midY), linePaint);
+        canvas.drawLine(_pt(firstX, midY), _pt(lastX, midY), linePaint);
       }
       for (final child in unit.children) {
         final childTopY =
             child.level * FamilyTreeView.levelHeight + 16;
         canvas.drawLine(
-            Offset(child.centerX, midY), Offset(child.centerX, childTopY),
+            _pt(child.centerX, midY), _pt(child.centerX, childTopY),
             linePaint);
       }
     }
@@ -318,7 +342,8 @@ class _ConnectorPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ConnectorPainter oldDelegate) =>
-      oldDelegate.layout != layout;
+      oldDelegate.layout != layout ||
+      oldDelegate.horizontal != horizontal;
 }
 
 /// Một người trên cây: vòng tròn chữ cái đầu + tên + năm sinh–năm mất.

@@ -96,6 +96,11 @@ class GenealogyRepository {
   Future<List<int>> exportLineage(String lineageId) async {
     return _api.downloadBytes('/genealogy/lineages/$lineageId/export');
   }
+
+  /// GET /genealogy/lineages/:id/backup — tải file JSON sao lưu.
+  Future<List<int>> backupLineage(String lineageId) async {
+    return _api.downloadBytes('/genealogy/lineages/$lineageId/backup');
+  }
 }
 
 final genealogyRepositoryProvider = Provider<GenealogyRepository>(

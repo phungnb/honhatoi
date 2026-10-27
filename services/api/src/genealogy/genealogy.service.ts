@@ -1262,4 +1262,55 @@ export class GenealogyService {
     const buffer = (await workbook.xlsx.writeBuffer()) as Buffer;
     return { buffer, filename: 'gia-pha.xlsx' };
   }
+
+  /**
+   * GET /genealogy/lineages/:lineageId/backup — sao lưu toàn bộ gia phả
+   * của MỘT dòng họ ra file JSON (để lưu trữ trọn đời và khôi phục
+   * sau này).
+   *
+   * Cô lập dữ liệu như endpoint export: chỉ sao lưu đúng lineage mà
+   * user có quyền xem. Trường nhạy cảm (điện thoại, email, nhóm máu)
+   * chỉ xuất khi user có quyền sửa — đúng quy tắc sanitize của API.
+   * Chỉ xuất dữ liệu, không kèm mã khôi phục: tính năng nhập lại
+   * (restore) sẽ làm ở bước sau với kiểm tra trùng lặp.
+   */
+  async backupLineage(
+    lineageId: string,
+    userId: string,
+  ): Promise<{ json: string; filename: string }> {
+    const perm = await this.effectivePerm(lineageId, userId);
+    this.require(perm, 'canView', 'sao lưu gia phả');
+
+    const [lineage, persons, rels, events] = await Promise.all([
+      this.prisma.lineage.findUnique({ where: { id: lineageId } }),
+      this.prisma.familyPerson.findMany({
+        where: { lineageId, deletedAt: null },
+        orderBy: [{ generation: 'asc' }, { fullName: 'asc' }],
+      }),
+      this.prisma.familyRelationship.findMany({ where: { lineageId } }),
+      this.prisma.event.findMany({
+        where: { lineageId },
+        orderBy: { startAt: 'asc' },
+      }),
+    ]);
+    if (!lineage)
+      throw new NotFoundException({
+        code: 'LINEAGE_NOT_FOUND',
+        message: 'Không tìm thấy dòng họ',
+      });
+
+    const backup = {
+      format: 'ho-nha-toi-backup',
+      version: 1,
+      lineage: { id: lineage.id, name: lineage.name },
+      exportedAt: new Date().toISOString(),
+      persons: persons.map((p) => this.sanitize(p, perm.canEdit)),
+      relationships: rels,
+      events,
+    };
+    return {
+      json: JSON.stringify(backup, null, 2),
+      filename: 'gia-pha-backup.json',
+    };
+  }
 }

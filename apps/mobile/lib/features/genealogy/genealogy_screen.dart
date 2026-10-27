@@ -138,18 +138,30 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
     }
   }
 
-  /// Xuất gia phả ra Excel rồi mở hộp thoại chia sẻ/lưu file.
-  Future<void> _export(String lineageId, String lineageName) async {
+  /// Xuất gia phả ra file rồi mở hộp thoại chia sẻ/lưu file.
+  ///
+  /// [kind] = 'excel' (bảng tính 3 sheet) hoặc 'backup' (JSON sao lưu
+  /// toàn bộ để khôi phục sau này).
+  Future<void> _export(
+    String lineageId,
+    String lineageName,
+    String kind,
+  ) async {
     try {
-      final bytes = await ref
-          .read(genealogyRepositoryProvider)
-          .exportLineage(lineageId);
+      final repo = ref.read(genealogyRepositoryProvider);
+      final bytes = kind == 'backup'
+          ? await repo.backupLineage(lineageId)
+          : await repo.exportLineage(lineageId);
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/gia-pha.xlsx');
+      final filename =
+          kind == 'backup' ? 'gia-pha-backup.json' : 'gia-pha.xlsx';
+      final file = File('${dir.path}/$filename');
       await file.writeAsBytes(bytes);
       await Share.shareXFiles(
         [XFile(file.path)],
-        text: 'Gia phả $lineageName',
+        text: kind == 'backup'
+            ? 'Bản sao lưu gia phả $lineageName'
+            : 'Gia phả $lineageName',
       );
     } catch (_) {
       if (mounted) {
@@ -187,13 +199,24 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
         elevation: 0,
         actions: [
           if (effectiveLineageId != null)
-            IconButton(
+            PopupMenuButton<String>(
               icon: const Icon(Icons.download_outlined),
-              tooltip: 'Xuất Excel',
-              onPressed: () => _export(
+              tooltip: 'Xuất / Sao lưu',
+              onSelected: (kind) => _export(
                 effectiveLineageId,
                 effectiveLineageName ?? 'Dòng họ',
+                kind,
               ),
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'excel',
+                  child: Text('Xuất Excel'),
+                ),
+                PopupMenuItem(
+                  value: 'backup',
+                  child: Text('Sao lưu JSON'),
+                ),
+              ],
             ),
         ],
       ),
@@ -400,8 +423,11 @@ class _SearchResults extends StatelessWidget {
   }
 }
 
-/// Cây gia phả của họ đang xem + nút tải thêm thế hệ.
-class _TreeSection extends ConsumerWidget {
+/// Chế độ hiển thị cây gia phả (ngang hàng web: dọc / ngang / danh sách).
+enum _TreeMode { vertical, horizontal, list }
+
+/// Cây gia phả của họ đang xem + nút tải thêm thế hệ + chuyển chế độ xem.
+class _TreeSection extends ConsumerStatefulWidget {
   const _TreeSection({
     required this.lineageId,
     required this.generations,
@@ -419,11 +445,18 @@ class _TreeSection extends ConsumerWidget {
       onPersonTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TreeSection> createState() => _TreeSectionState();
+}
+
+class _TreeSectionState extends ConsumerState<_TreeSection> {
+  _TreeMode _mode = _TreeMode.vertical;
+
+  @override
+  Widget build(BuildContext context) {
     final p = context.palette;
     final treeAsync = ref.watch(
       genealogyTreeProvider(
-        (lineageId: lineageId, generations: generations),
+        (lineageId: widget.lineageId, generations: widget.generations),
       ),
     );
 
@@ -431,7 +464,7 @@ class _TreeSection extends ConsumerWidget {
       value: treeAsync,
       onRetry: () => ref.invalidate(
         genealogyTreeProvider(
-          (lineageId: lineageId, generations: generations),
+          (lineageId: widget.lineageId, generations: widget.generations),
         ),
       ),
       builder: (tree) {
@@ -457,29 +490,63 @@ class _TreeSection extends ConsumerWidget {
               .toList();
         }
 
+        // Danh sách sắp theo đời rồi tên (chế độ danh sách).
+        final sortedPersons = [...persons]
+          ..sort((a, b) {
+            final ga = a['generation'] as int? ?? 999;
+            final gb = b['generation'] as int? ?? 999;
+            if (ga != gb) return ga.compareTo(gb);
+            return ((a['fullName'] as String?) ?? '')
+                .compareTo((b['fullName'] as String?) ?? '');
+          });
+
         return Column(
           children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: FamilyTreeView(
-                  root: root,
-                  persons: persons,
-                  relationships: relationships,
-                  onPersonTap: (person) => onPersonTap(
-                    person,
-                    parentIdsOf(person['id'] as String),
-                  ),
-                ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Row(
+                children: [
+                  _modeChip('Cây dọc', _TreeMode.vertical),
+                  const SizedBox(width: 8),
+                  _modeChip('Cây ngang', _TreeMode.horizontal),
+                  const SizedBox(width: 8),
+                  _modeChip('Danh sách', _TreeMode.list),
+                ],
               ),
             ),
-            if (hasMore && generations < 6)
+            Expanded(
+              child: _mode == _TreeMode.list
+                  ? _PersonList(
+                      persons: sortedPersons,
+                      onTap: (person) => widget.onPersonTap(
+                        person,
+                        parentIdsOf(person['id'] as String),
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: FamilyTreeView(
+                        root: root,
+                        persons: persons,
+                        relationships: relationships,
+                        horizontal: _mode == _TreeMode.horizontal,
+                        onPersonTap: (person) => widget.onPersonTap(
+                          person,
+                          parentIdsOf(person['id'] as String),
+                        ),
+                      ),
+                    ),
+            ),
+            if (hasMore && widget.generations < 6)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: OutlinedButton.icon(
-                  onPressed: onLoadMore,
+                  onPressed: widget.onLoadMore,
                   icon: const Icon(Icons.expand_more),
-                  label: Text('Xem thêm thế hệ (đang $generations)'),
+                  label: Text(
+                    'Xem thêm thế hệ (đang ${widget.generations})',
+                  ),
                 ),
               )
             else
@@ -492,6 +559,79 @@ class _TreeSection extends ConsumerWidget {
                 ),
               ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _modeChip(String label, _TreeMode mode) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: _mode == mode,
+      onSelected: (_) => setState(() => _mode = mode),
+    );
+  }
+}
+
+/// Danh sách thành viên (chế độ xem Danh sách của cây gia phả).
+class _PersonList extends StatelessWidget {
+  const _PersonList({required this.persons, required this.onTap});
+
+  final List<Map<String, dynamic>> persons;
+  final void Function(Map<String, dynamic> person) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    if (persons.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Dòng họ chưa có hồ sơ gia phả nào.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: p.secondary, fontSize: 14),
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      itemCount: persons.length,
+      itemBuilder: (context, index) {
+        final person = persons[index];
+        final name = (person['fullName'] as String?) ?? 'Chưa rõ tên';
+        final deceased = person['dateOfDeath'] != null;
+        final generation = person['generation'] as int?;
+        final branch = person['branch'] as String?;
+        final detail = [
+          if (generation != null) 'Đời $generation',
+          if (branch != null && branch.isNotEmpty) branch,
+        ].join(' · ');
+        return Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: p.elevated,
+              child: Text(
+                name.isNotEmpty ? name.characters.first : '?',
+                style: TextStyle(
+                  color: deceased ? p.warmAccent : p.brand,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            title: Text(name),
+            subtitle: detail.isEmpty ? null : Text(detail),
+            trailing: Text(
+              deceased ? 'Đã mất' : 'Còn sống',
+              style: TextStyle(
+                color: deceased ? p.warmAccent : p.brand,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onTap: () => onTap(person),
+          ),
         );
       },
     );
