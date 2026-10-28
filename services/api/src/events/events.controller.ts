@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -17,60 +16,83 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { LineageGuard } from '../common/guards/lineage.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
 
-@UseGuards(JwtAuthGuard)
-@Controller()
+@UseGuards(JwtAuthGuard, LineageGuard)
+@Controller('lineages/:lineageId/events')
 export class EventsController {
   constructor(private readonly events: EventsService) {}
 
-  @Post('lineages/:lineageId/events')
-  @UseGuards(LineageGuard)
+  @Post()
   create(
-    @Param('lineageId') lineageId: string,
     @CurrentUserId() userId: string,
+    @Param('lineageId') lineageId: string,
     @Body() dto: CreateEventDto,
   ) {
-    return this.events.create(lineageId, userId, dto);
+    return this.events.create(userId, lineageId, dto);
   }
 
-  @Get('lineages/:lineageId/events')
-  @UseGuards(LineageGuard)
-  findAll(
+  @Get()
+  list(
+    @CurrentUserId() userId: string,
     @Param('lineageId') lineageId: string,
-    @Query('type') type?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Query('upcomingOnly') upcomingOnly?: string,
+    @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.events.findAll(lineageId, {
-      type,
-      from,
-      to,
-      limit: limit ? Number(limit) : undefined,
+    return this.events.list(userId, lineageId, {
+      upcomingOnly: upcomingOnly !== 'false',
+      cursor,
+      limit: limit ? Number(limit) || 30 : undefined,
     });
   }
 
-  @Get('events/:id')
-  findOne(@Param('id') id: string) {
-    return this.events.findOne(id);
+  @Get(':id')
+  detail(
+    @CurrentUserId() userId: string,
+    @Param('lineageId') lineageId: string,
+    @Param('id') id: string,
+  ) {
+    return this.events.detail(userId, lineageId, id);
   }
 
-  @Patch('events/:id')
-  update(@Param('id') id: string, @Body() dto: UpdateEventDto) {
-    return this.events.update(id, dto);
+  @Patch(':id')
+  update(
+    @CurrentUserId() userId: string,
+    @Param('lineageId') lineageId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateEventDto,
+  ) {
+    return this.events.update(userId, lineageId, id, dto);
   }
 
-  @Delete('events/:id')
-  remove(@Param('id') id: string) {
-    return this.events.remove(id);
+  @Post(':id/cancel')
+  cancel(
+    @CurrentUserId() userId: string,
+    @Param('lineageId') lineageId: string,
+    @Param('id') id: string,
+  ) {
+    return this.events.cancel(userId, lineageId, id);
   }
 
-  @Post('events/:id/rsvp')
-  rsvp(@Param('id') id: string, @CurrentUserId() userId: string, @Body() dto: RsvpDto) {
-    return this.events.rsvp(id, userId, dto.rsvpStatus);
+  @Post(':id/rsvp')
+  rsvp(
+    @CurrentUserId() userId: string,
+    @Param('lineageId') lineageId: string,
+    @Param('id') id: string,
+    @Body() dto: RsvpDto,
+  ) {
+    return this.events.rsvp(userId, lineageId, id, {
+      status: dto.status,
+      guestCount: dto.guestCount,
+    });
   }
 
-  @Get('events/:id/participants')
-  findParticipants(@Param('id') id: string) {
-    return this.events.findParticipants(id);
+  @Get(':id/attendees')
+  attendees(
+    @CurrentUserId() userId: string,
+    @Param('lineageId') lineageId: string,
+    @Param('id') id: string,
+    @Query('status') status?: string,
+  ) {
+    return this.events.attendees(userId, lineageId, id, status);
   }
 }

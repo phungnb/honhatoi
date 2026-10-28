@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../theme/app_theme.dart';
-import '../../theme/theme_mode_provider.dart';
+import 'package:ho_nha_toi/core/auth_state.dart';
+import 'package:ho_nha_toi/core/repositories/lineage_repository.dart';
+import 'package:ho_nha_toi/core/widgets/async_view.dart';
+import 'package:ho_nha_toi/theme/app_theme.dart';
+import 'package:ho_nha_toi/theme/theme_mode_provider.dart';
 
-/// Tab Cá nhân: hồ sơ người dùng, danh sách dòng họ đã tham gia,
-/// cài đặt quyền riêng tư và công tắc Sáng/Tối.
+/// Tab Cá nhân: hồ sơ người dùng (từ GET /auth/me), danh sách dòng họ
+/// đã tham gia (dữ liệu thật), cài đặt giao diện và đăng xuất.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -24,56 +27,43 @@ class ProfileScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          // Hồ sơ
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: AppTheme.cardDecoration(p),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 38,
-                  backgroundColor: p.brand,
-                  child: Text(
-                    'B',
-                    style: TextStyle(
-                      color: p.onBrand,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 32,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Ba Phùng Nguyễn',
-                  style: TextStyle(
-                    color: p.text,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 19,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Đời thứ 3 · Chi trưởng · Đã xác minh',
-                  style: TextStyle(color: p.secondary, fontSize: 13),
-                ),
-              ],
-            ),
+          // Hồ sơ — dữ liệu thật từ /auth/me
+          AsyncView<Map<String, dynamic>>(
+            value: ref.watch(authMeProvider),
+            onRetry: () => ref.invalidate(authMeProvider),
+            builder: (user) => _profileCard(p, user),
           ),
           const SizedBox(height: 20),
           _sectionTitle(p, 'DÒNG HỌ CỦA TÔI'),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: AppTheme.cardDecoration(p),
-            child: Column(
-              children: [
-                _lineageRow(p, 'N', 'Họ Nguyễn tại Đồng Nai',
-                    '28 thành viên · Đồng Nai', true),
-                Divider(color: p.border, height: 1),
-                _lineageRow(p, 'T', 'Họ Trần tại TP. Hồ Chí Minh',
-                    '16 thành viên · TP. Hồ Chí Minh', false),
-              ],
-            ),
+          // Danh sách dòng họ thật
+          AsyncView<List<Map<String, dynamic>>>(
+            value: ref.watch(myLineagesProvider),
+            onRetry: () => ref.invalidate(myLineagesProvider),
+            builder: (lineages) {
+              if (lineages.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: AppTheme.cardDecoration(p),
+                  child: Text(
+                    'Bạn chưa tham gia dòng họ nào.',
+                    style: TextStyle(color: p.secondary, fontSize: 14),
+                  ),
+                );
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: AppTheme.cardDecoration(p),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < lineages.length; i++) ...[
+                      if (i > 0) Divider(color: p.border, height: 1),
+                      _lineageRow(p, lineages[i], i == 0),
+                    ],
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 8),
           Text(
@@ -89,33 +79,31 @@ class ProfileScreen extends ConsumerWidget {
             child: SwitchListTile(
               title: Text(
                 'Chế độ sáng',
-                style: TextStyle(
-                    color: p.text, fontWeight: FontWeight.w600),
+                style:
+                    TextStyle(color: p.text, fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
                 'Dễ đọc hơn vào ban ngày',
                 style: TextStyle(color: p.secondary, fontSize: 13),
               ),
               value: isLight,
-              onChanged: (_) =>
-                  ref.read(themeModeProvider.notifier).toggle(),
+              onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
               activeTrackColor: p.brand,
             ),
           ),
           const SizedBox(height: 20),
-          _sectionTitle(p, 'QUYỀN RIÊNG TƯ'),
+          _sectionTitle(p, 'TÀI KHOẢN'),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: AppTheme.cardDecoration(p),
-            child: Column(
-              children: [
-                _kvRow(p, 'Số điện thoại', 'Chỉ mình tôi', p.brand),
-                Divider(color: p.border, height: 1),
-                _kvRow(p, 'Ngày sinh', 'Thành viên dòng họ', null),
-                Divider(color: p.border, height: 1),
-                _kvRow(p, 'Đăng nhập bằng passkey', 'Đã bật', p.brand),
-              ],
+            child: ListTile(
+              leading: Icon(Icons.logout, color: p.live),
+              title: Text(
+                'Đăng xuất',
+                style: TextStyle(
+                    color: p.live, fontWeight: FontWeight.w600),
+              ),
+              onTap: () => _confirmLogout(context, ref),
             ),
           ),
           const SizedBox(height: 20),
@@ -130,6 +118,83 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Widget _profileCard(AppPalette p, Map<String, dynamic> user) {
+    final displayName = (user['displayName'] as String?) ?? 'Người dùng';
+    final phone = (user['phone'] as String?) ?? '';
+    final profile = user['profile'] as Map<String, dynamic>?;
+    final fullName = profile?['fullName'] as String?;
+    final initial =
+        displayName.isNotEmpty ? displayName.characters.first : '?';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration(p),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 38,
+            backgroundColor: p.brand,
+            child: Text(
+              initial,
+              style: TextStyle(
+                color: p.onBrand,
+                fontWeight: FontWeight.w800,
+                fontSize: 32,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            displayName,
+            style: TextStyle(
+              color: p.text,
+              fontWeight: FontWeight.w800,
+              fontSize: 19,
+            ),
+          ),
+          if (fullName != null && fullName != displayName) ...[
+            const SizedBox(height: 2),
+            Text(fullName,
+                style: TextStyle(color: p.secondary, fontSize: 13)),
+          ],
+          if (phone.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(phone,
+                style: TextStyle(color: p.secondary, fontSize: 13)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final p = context.palette;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.surface,
+        title: Text('Đăng xuất', style: TextStyle(color: p.text)),
+        content: Text(
+          'Bạn có chắc muốn đăng xuất khỏi thiết bị này?',
+          style: TextStyle(color: p.secondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Đăng xuất', style: TextStyle(color: p.live)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(authStateProvider.notifier).logout();
+    }
+  }
+
   Widget _sectionTitle(AppPalette p, String text) => Text(
         text,
         style: TextStyle(
@@ -140,8 +205,19 @@ class ProfileScreen extends ConsumerWidget {
         ),
       );
 
-  Widget _lineageRow(AppPalette p, String initial, String name,
-      String sub, bool active) {
+  /// Một dòng họ trong danh sách — dữ liệu thật từ API.
+  Widget _lineageRow(
+      AppPalette p, Map<String, dynamic> lineage, bool active) {
+    final name = (lineage['name'] as String?) ?? 'Dòng họ';
+    final hometown = (lineage['hometownProvince'] as String?) ?? '';
+    final memberCount = lineage['memberCount'];
+    final initial = name.isNotEmpty ? name.characters.first : '?';
+    final sub = [
+      if (memberCount != null) '$memberCount thành viên',
+      if (hometown.isNotEmpty) hometown,
+      lineageRoleLabel(lineage['myRole'] as String?),
+    ].join(' · ');
+
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
@@ -154,14 +230,12 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
       ),
-      title: Text(name,
-          style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle:
-          Text(sub, style: TextStyle(color: p.secondary, fontSize: 13)),
+      title:
+          Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(sub, style: TextStyle(color: p.secondary, fontSize: 13)),
       trailing: active
           ? Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: p.brand.withAlpha(26),
                 borderRadius: BorderRadius.circular(999),
@@ -177,26 +251,6 @@ class ProfileScreen extends ConsumerWidget {
             )
           : null,
       onTap: () {},
-    );
-  }
-
-  Widget _kvRow(AppPalette p, String key, String value, Color? valueColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(key, style: TextStyle(color: p.secondary, fontSize: 14)),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor ?? p.text,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
