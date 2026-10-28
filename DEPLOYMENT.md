@@ -11,11 +11,14 @@ Dự án dùng 2 Vercel project riêng (monorepo):
 
 - Entry: `services/api/api/index.ts` — khởi tạo NestJS một lần, giữ ấm giữa các invocation.
 - `services/api/vercel.json`:
-  - `buildCommand`: `prisma generate && npm run build && prisma db push --skip-generate`
-    (đồng bộ schema lên database trong lúc build). **Không dùng `--accept-data-loss`**:
-    nếu thay đổi schema có thể làm mất dữ liệu (xóa/đổi tên cột), build sẽ dừng
-    lại thay vì tự xóa dữ liệu production. Bước tiếp theo: chuyển sang
-    `prisma migrate deploy` với thư mục `prisma/migrations`.
+  - `buildCommand`: `prisma generate && npm run build && sh scripts/db-sync.sh`.
+    `scripts/db-sync.sh`:
+    - Build **preview** (PR): bỏ qua database — không để nhánh chưa merge đổi
+      schema production.
+    - Build **production**: chạy `prisma/sql/2026-10-28-gop-vai-tro.sql`
+      (chuyển 7 vai trò cũ về 3, idempotent) rồi `prisma db push`.
+      **Không dùng `--accept-data-loss`**: thay đổi có thể làm mất dữ liệu sẽ
+      dừng build thay vì xóa dữ liệu. Bước tiếp theo: `prisma migrate deploy`.
   - `rewrites`: `/api/v1/*` → `/api` (giữ nguyên prefix `api/v1` của app).
 - Biến môi trường (đã cài trên Vercel): `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`.
 - **Giới hạn:** WebSocket chat realtime KHÔNG chạy trên serverless. Các API REST chạy bình thường.
@@ -28,3 +31,12 @@ Dự án dùng 2 Vercel project riêng (monorepo):
 ## App Flutter
 
 Không deploy lên Vercel (app di động). Build APK/IPA riêng để phân phối.
+
+## Phân quyền (từ 28/10/2026)
+
+- Trong mỗi dòng họ: `MEMBER` (Thành viên), `EDITOR` (Người giữ gia phả),
+  `ADMIN` (Ban quản trị). Trưởng tộc = `lineages.owner_user_id`.
+- Quản trị nền tảng (`/super-admin`): bật bằng SQL, không có API cấp quyền:
+  `UPDATE users SET is_platform_admin = true WHERE phone = '<số ĐT>';`
+- Web: một cổng `/quan-ly`; đường dẫn cũ (`/duyet-xac-minh`,
+  `/admin/<họ>/duyet-xac-minh`, `/dong-ho`…) tự chuyển hướng.

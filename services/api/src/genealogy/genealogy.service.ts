@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { findKinship } from './kinship';
+import { can } from '../common/permissions';
 import {
   formatLunar,
   nextAnniversary,
@@ -54,6 +55,7 @@ interface Perm {
   canEdit: boolean;
   canVerify: boolean;
   canManage: boolean;
+  canExport: boolean;
 }
 
 const NO_PERM: Perm = {
@@ -62,6 +64,7 @@ const NO_PERM: Perm = {
   canEdit: false,
   canVerify: false,
   canManage: false,
+  canExport: false,
 };
 
 @Injectable()
@@ -87,98 +90,41 @@ export class GenealogyService {
   }
 
   /**
-   * Quyền hiệu lực của user trong lineage (HNT-T-024):
-   *  0. BẮT BUỘC là thành viên đã duyệt — kiểm tra trước mọi thứ, để người
-   *     đã bị xóa/rời họ không còn dùng được bản ghi quyền cũ (các route
-   *     /persons/:id, /proposals/:id… không đi qua LineageGuard),
-   *  1. bản ghi genealogy_permissions theo person (nếu có personId),
-   *  2. bản ghi theo lineage (personId null),
-   *  3. mặc định theo vai trò membership.
+   * Quyền hiệu lực của user trong lineage — suy ra DUY NHẤT từ vai trò +
+   * cờ Trưởng tộc qua can() (common/permissions.ts). Bảng
+   * genealogy_permissions không còn được đọc.
+   * Bắt buộc là thành viên đã duyệt: các route /persons/:id, /proposals/:id…
+   * không đi qua LineageGuard nên phải kiểm tra ở đây.
    */
-  private async effectivePerm(
-    lineageId: string,
-    userId: string,
-    personId?: string,
-  ): Promise<Perm> {
-    const membership = await this.prisma.lineageMembership.findFirst({
-      where: { lineageId, userId, status: 'approved' },
-      select: { role: true },
-    });
+  private async effectivePerm(lineageId: string, userId: string): Promise<Perm> {
+    const [membership, lineage] = await Promise.all([
+      this.prisma.lineageMembership.findFirst({
+        where: { lineageId, userId, status: 'approved' },
+        select: { role: true },
+      }),
+      this.prisma.lineage.findUnique({
+        where: { id: lineageId },
+        select: { ownerUserId: true },
+      }),
+    ]);
     if (!membership)
       throw new ForbiddenException({
         code: 'NOT_LINEAGE_MEMBER',
         message:
           'Bạn không phải thành viên được duyệt của dòng họ này — không thể truy cập dữ liệu của họ khác',
       });
-
-    if (personId) {
-      const scoped = await this.prisma.genealogyPermission.findFirst({
-        where: { lineageId, userId, personId },
-      });
-      if (scoped) return this.toPerm(scoped);
-    }
-    const wide = await this.prisma.genealogyPermission.findFirst({
-      where: { lineageId, userId, personId: null },
-    });
-    if (wide) return this.toPerm(wide);
-
-    return this.roleDefaultPerm(membership.role as string);
-  }
-
-  private toPerm(row: {
-    canView: boolean;
-    canPropose: boolean;
-    canEdit: boolean;
-    canVerify: boolean;
-    canManage: boolean;
-  }): Perm {
-    return {
-      canView: row.canView,
-      canPropose: row.canPropose,
-      canEdit: row.canEdit,
-      canVerify: row.canVerify,
-      canManage: row.canManage,
+    const actor = {
+      role: membership.role,
+      isOwner: lineage?.ownerUserId === userId,
     };
-  }
-
-  private roleDefaultPerm(role: string): Perm {
-    switch (role) {
-      case 'SYSTEM_ADMIN':
-      case 'SENIOR_ADMIN':
-      case 'ADMIN':
-        return {
-          canView: true,
-          canPropose: true,
-          canEdit: true,
-          canVerify: true,
-          canManage: true,
-        };
-      case 'GENEALOGY_MANAGER':
-        return {
-          canView: true,
-          canPropose: true,
-          canEdit: true,
-          canVerify: true,
-          canManage: false,
-        };
-      case 'MEMBER':
-      case 'APP_MEMBER':
-        return {
-          canView: true,
-          canPropose: true,
-          canEdit: false,
-          canVerify: false,
-          canManage: false,
-        };
-      default: // GUEST và các giá trị khác: chỉ xem
-        return {
-          canView: true,
-          canPropose: false,
-          canEdit: false,
-          canVerify: false,
-          canManage: false,
-        };
-    }
+    return {
+      canView: can(actor, 'genealogy.view'),
+      canPropose: can(actor, 'genealogy.propose'),
+      canEdit: can(actor, 'genealogy.edit'),
+      canVerify: can(actor, 'genealogy.edit'),
+      canManage: can(actor, 'genealogy.selfApprove'),
+      canExport: can(actor, 'genealogy.export'),
+    };
   }
 
   private require(perm: Perm, key: keyof Perm, action: string) {
@@ -1249,7 +1195,7 @@ export class GenealogyService {
     userId: string,
   ): Promise<{ buffer: Buffer; filename: string }> {
     const perm = await this.effectivePerm(lineageId, userId);
-    this.require(perm, 'canView', 'xuất gia phả');
+    this.require(perm, 'canExport', 'xuất gia phả');
 
     const [lineage, persons, rels, events] = await Promise.all([
       this.prisma.lineage.findUnique({ where: { id: lineageId } }),
@@ -1416,7 +1362,7 @@ export class GenealogyService {
     userId: string,
   ): Promise<{ json: string; filename: string }> {
     const perm = await this.effectivePerm(lineageId, userId);
-    this.require(perm, 'canView', 'sao lưu gia phả');
+    this.require(perm, 'canExport', 'sao lưu gia phả');
 
     const [lineage, persons, rels, events] = await Promise.all([
       this.prisma.lineage.findUnique({ where: { id: lineageId } }),

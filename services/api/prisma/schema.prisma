@@ -37,18 +37,19 @@ enum VerificationStatus {
   DISPUTED            @map("disputed")
 }
 
-/// 7 vai trò theo Security-Matrix §1 (R1..R7).
-/// Cột lineage_memberships.role theo spec 2.3 dùng 4 giá trị trong phạm vi
-/// dòng họ: MEMBER, GENEALOGY_MANAGER, ADMIN, SENIOR_ADMIN.
-/// GUEST / APP_MEMBER / SYSTEM_ADMIN là vai trò cấp nền tảng, dùng trong guard.
+/// 3 vai trò trong phạm vi dòng họ (gộp từ 7 vai trò cũ, 28/10/2026).
+/// - MEMBER: thành viên — xem, đề xuất sửa gia phả.
+/// - EDITOR: người giữ gia phả — sửa trực tiếp, duyệt đề xuất (trước đây
+///   là genealogy_manager).
+/// - ADMIN: ban quản trị — duyệt người vào họ, mã mời, cấp/thu vai trò EDITOR.
+/// "Trưởng tộc" = ADMIN đồng thời là lineages.owner_user_id (duy nhất mỗi họ):
+/// riêng người này cấp/thu ADMIN, chuyển quyền sở hữu, xóa họ.
+/// Quyền nền tảng tách riêng ở users.is_platform_admin (không gắn dòng họ).
+/// Chuyển dữ liệu từ enum cũ: prisma/sql/2026-10-28-gop-vai-tro.sql.
 enum LineageRole {
-  GUEST             @map("guest")
-  APP_MEMBER        @map("app_member")
-  MEMBER            @map("member")
-  GENEALOGY_MANAGER @map("genealogy_manager")
-  ADMIN             @map("admin")
-  SENIOR_ADMIN      @map("senior_admin")
-  SYSTEM_ADMIN      @map("system_admin")
+  MEMBER @map("member")
+  EDITOR @map("editor")
+  ADMIN  @map("admin")
 }
 
 /// Loại cuộc trò chuyện (spec 2.4, bảng chat_conversations).
@@ -83,6 +84,9 @@ model User {
   displayName  String     @map("display_name") @db.VarChar(100)
   avatarUrl    String?    @map("avatar_url") @db.Text
   status       UserStatus @default(ACTIVE)
+  /// Quản trị nền tảng (người vận hành). Chỉ bật bằng SQL — không có API
+  /// nào cấp quyền này.
+  isPlatformAdmin Boolean @default(false) @map("is_platform_admin")
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(6)
@@ -91,6 +95,7 @@ model User {
   sessions               UserSession[]
   pushDevices            PushDevice[]
   createdLineages        Lineage[]               @relation("LineageCreator")
+  ownedLineages          Lineage[]               @relation("LineageOwner")
   lineageMemberships     LineageMembership[]
   reviewedMemberships    LineageMembership[]     @relation("MembershipReviewer")
   createdInvites         LineageInvite[]
@@ -220,6 +225,9 @@ model Lineage {
   defaultTreeLayout    String    @default("vertical") @map("default_tree_layout") @db.VarChar(20)
   createdBy            String?   @map("created_by") @db.Uuid
   createdByUser        User?     @relation("LineageCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  /// Trưởng tộc — người sở hữu duy nhất của họ (xem enum LineageRole).
+  ownerUserId          String?   @map("owner_user_id") @db.Uuid
+  owner                User?     @relation("LineageOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
