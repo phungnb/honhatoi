@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ChatRoomType, UserStatus } from '@prisma/client';
+import { ChatRoomType, LineageRole, UserStatus } from '@prisma/client';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 
@@ -25,7 +25,11 @@ const TYPE_MAP: Record<string, ChatRoomType> = {
 };
 
 /** Vai trò được coi là quản trị dòng họ (dùng cho quyền quản lý conversation). */
-const LINEAGE_ADMIN_ROLES = ['ADMIN', 'SENIOR_ADMIN', 'SYSTEM_ADMIN'];
+const LINEAGE_ADMIN_ROLES: LineageRole[] = [
+  LineageRole.ADMIN,
+  LineageRole.SENIOR_ADMIN,
+  LineageRole.SYSTEM_ADMIN,
+];
 
 @Injectable()
 export class ChatService {
