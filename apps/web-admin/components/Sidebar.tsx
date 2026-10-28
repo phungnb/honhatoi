@@ -1,22 +1,31 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const NAV_ITEMS = [
-  { href: "/", label: "Tổng quan" },
-  { href: "/duyet-xac-minh", label: "Duyệt xác minh gia phả" },
-  { href: "/dong-ho", label: "Dòng họ" },
-  { href: "/thanh-vien", label: "Thành viên" },
-  { href: "/dang-nhap", label: "Đăng nhập" },
-  { href: "/nhat-ky", label: "Nhật ký kiểm toán" },
-  { href: "/cai-dat", label: "Cài đặt" },
-  { href: "/app", label: "Không gian con cháu" },
-  { href: "/super-admin", label: "Quản trị nền tảng" },
-];
+import { get, getAccessToken } from "@/lib/api";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [platformAdmin, setPlatformAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!getAccessToken()) return;
+    setLoggedIn(true);
+    get<{ data?: { user?: { isPlatformAdmin?: boolean } } }>("/auth/me")
+      .then((b) => setPlatformAdmin(b?.data?.user?.isPlatformAdmin === true))
+      .catch(() => setLoggedIn(false));
+  }, [pathname]);
+
+  // Menu gọn: 1 cổng quản lý + không gian con cháu; mục nền tảng chỉ hiện
+  // với tài khoản quản trị nền tảng.
+  const NAV_ITEMS = [
+    { href: "/quan-ly", label: "Quản lý dòng họ" },
+    { href: "/app", label: "Không gian con cháu" },
+    ...(platformAdmin ? [{ href: "/super-admin", label: "Quản trị nền tảng" }] : []),
+    ...(loggedIn ? [] : [{ href: "/dang-nhap", label: "Đăng nhập" }]),
+  ];
 
   // Hai luồng khác (con cháu, nền tảng) có không gian riêng, không dùng
   // sidebar của cổng Trưởng tộc — nhưng vẫn cùng 1 domain, chung 1 lần
@@ -42,10 +51,7 @@ export default function Sidebar() {
 
       <nav>
         {NAV_ITEMS.map((item) => {
-          const active =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
@@ -60,9 +66,8 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-foot">
-        Phiên bản 0.3.0 — cấu trúc 1 domain: /app (con cháu),
-        /admin/[họ] (Trưởng tộc), /super-admin (nền tảng), chung 1 lần
-        đăng nhập.
+        Phiên bản 0.4.0 — 3 vai trò: Thành viên, Người giữ gia phả, Ban
+        quản trị (Trưởng tộc là người sở hữu họ).
       </div>
     </aside>
   );

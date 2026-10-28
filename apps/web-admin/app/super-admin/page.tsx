@@ -2,8 +2,8 @@
 
 /**
  * Cổng Quản trị Nền tảng (Luồng 1 theo đánh giá chuyên gia 27/10/2026):
- * /super-admin — cùng 1 domain với /app và /admin, chung 1 lần đăng
- * nhập. Chỉ tài khoản có vai trò SYSTEM_ADMIN mới xem được danh sách
+ * /super-admin — cùng 1 domain với /app và /quan-ly, chung 1 lần đăng
+ * nhập. Chỉ tài khoản có cờ users.is_platform_admin mới xem được danh sách
  * toàn bộ dòng họ; tài khoản thường nhận 403 kèm lý do rõ ràng.
  */
 
@@ -78,9 +78,9 @@ export default function SuperAdminPage() {
         <div className="card">
           <p>
             Tài khoản này chưa có quyền quản trị nền tảng. Quyền super
-            admin được cấp bằng vai trò SYSTEM_ADMIN — liên hệ người vận
-            hành hệ thống để được cấp quyền, không tự nâng quyền từ giao
-            diện.
+            admin chỉ được bật trực tiếp trong cơ sở dữ liệu
+            (users.is_platform_admin) bởi người vận hành hệ thống — không
+            có cách tự nâng quyền từ giao diện.
           </p>
         </div>
       )}
@@ -110,7 +110,7 @@ export default function SuperAdminPage() {
                 {lineages.map((l) => (
                   <tr key={l.id}>
                     <td>
-                      <Link href={`/admin/${l.id}/duyet-xac-minh`}>
+                      <Link href={`/quan-ly/${l.id}`}>
                         {l.name}
                       </Link>
                     </td>
