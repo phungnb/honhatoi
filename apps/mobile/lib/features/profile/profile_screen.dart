@@ -215,7 +215,10 @@ class ProfileScreen extends ConsumerWidget {
     final sub = [
       if (memberCount != null) '$memberCount thành viên',
       if (hometown.isNotEmpty) hometown,
-      lineageRoleLabel(lineage['myRole'] as String?),
+      lineageRoleLabel(
+        lineage['myRole'] as String?,
+        isOwner: lineage['isOwner'] == true,
+      ),
     ].join(' · ');
 
     return ListTile(

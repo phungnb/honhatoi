@@ -36,23 +36,14 @@ final myLineagesProvider =
   return ref.watch(lineageRepositoryProvider).myLineages();
 });
 
-/// Nhãn tiếng Việt cho vai trò trong dòng họ.
-String lineageRoleLabel(String? role) {
+/// Nhãn tiếng Việt cho vai trò trong dòng họ (3 vai trò + Trưởng tộc).
+String lineageRoleLabel(String? role, {bool isOwner = false}) {
+  if (isOwner) return 'Trưởng tộc';
   switch (role) {
-    case 'SYSTEM_ADMIN':
-      return 'Quản trị hệ thống';
-    case 'SENIOR_ADMIN':
-      return 'Trưởng họ';
     case 'ADMIN':
-      return 'Quản trị';
-    case 'GENEALOGY_MANAGER':
-      return 'Quản lý gia phả';
-    case 'MEMBER':
-      return 'Thành viên';
-    case 'APP_MEMBER':
-      return 'Thành viên app';
-    case 'GUEST':
-      return 'Khách';
+      return 'Ban quản trị';
+    case 'EDITOR':
+      return 'Người giữ gia phả';
     default:
       return 'Thành viên';
   }
