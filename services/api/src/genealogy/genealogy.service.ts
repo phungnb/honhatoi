@@ -88,6 +88,9 @@ export class GenealogyService {
 
   /**
    * Quyền hiệu lực của user trong lineage (HNT-T-024):
+   *  0. BẮT BUỘC là thành viên đã duyệt — kiểm tra trước mọi thứ, để người
+   *     đã bị xóa/rời họ không còn dùng được bản ghi quyền cũ (các route
+   *     /persons/:id, /proposals/:id… không đi qua LineageGuard),
    *  1. bản ghi genealogy_permissions theo person (nếu có personId),
    *  2. bản ghi theo lineage (personId null),
    *  3. mặc định theo vai trò membership.
@@ -97,6 +100,17 @@ export class GenealogyService {
     userId: string,
     personId?: string,
   ): Promise<Perm> {
+    const membership = await this.prisma.lineageMembership.findFirst({
+      where: { lineageId, userId, status: 'approved' },
+      select: { role: true },
+    });
+    if (!membership)
+      throw new ForbiddenException({
+        code: 'NOT_LINEAGE_MEMBER',
+        message:
+          'Bạn không phải thành viên được duyệt của dòng họ này — không thể truy cập dữ liệu của họ khác',
+      });
+
     if (personId) {
       const scoped = await this.prisma.genealogyPermission.findFirst({
         where: { lineageId, userId, personId },
@@ -108,16 +122,6 @@ export class GenealogyService {
     });
     if (wide) return this.toPerm(wide);
 
-    const membership = await this.prisma.lineageMembership.findFirst({
-      where: { lineageId, userId, status: 'approved' },
-      select: { role: true },
-    });
-    if (!membership)
-      throw new ForbiddenException({
-        code: 'NOT_LINEAGE_MEMBER',
-        message:
-          'Bạn không phải thành viên được duyệt của dòng họ này — không thể truy cập dữ liệu của họ khác',
-      });
     return this.roleDefaultPerm(membership.role as string);
   }
 
@@ -1392,7 +1396,7 @@ export class GenealogyService {
       });
     }
 
-    const buffer = (await workbook.xlsx.writeBuffer()) as Buffer;
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     return { buffer, filename: 'gia-pha.xlsx' };
   }
 
