@@ -8,126 +8,142 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
+import { UserStatus } from '@prisma/client';
 import { ChatService } from './chat.service';
-import { SendMessageDto } from './dto/send-message.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { jwtSecret } from '../auth/jwt-secret';
 
 /**
- * ChatGateway — realtime theo spec mục 4.
- * Endpoint: ws(s)://host/realtime (namespace '/realtime').
- * Client mở MỘT kết nối sau đăng nhập, truyền access_token trong handshake;
- * khi token xoay vòng, gửi message `auth` để cập nhật.
+ * ChatGateway — realtime cho module Chat.
+ * Endpoint: ws(s)://host/chat (namespace '/chat').
+ * Client mở kết nối sau đăng nhập, truyền access token trong handshake.auth.token
+ * (dạng 'Bearer xxx' hoặc token thuần). Token không hợp lệ hoặc user không còn
+ * ACTIVE → ngắt kết nối ngay.
  *
- * Sự kiện (spec 4.2):
- *  - server → client: message:new, message:updated, message:recalled,
- *    message:deleted, message:read, typing:start/stop, conversation:updated,
- *    notification:new, message:ack
- *  - client → server: message:send, typing:start/stop, auth, sync
+ * Sự kiện client → server: join, send_message, typing, mark_read
+ * Sự kiện server → client: message:new, typing, message:read
  */
-@WebSocketGateway({ namespace: '/realtime', cors: { origin: true, credentials: true } })
+@WebSocketGateway({ namespace: '/chat', cors: true })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  /** Registry user_id → tập connection (đa thiết bị) — spec 4.1. */
-  private readonly connections = new Map<string, Set<string>>();
+  private readonly jwt = new JwtService({ secret: jwtSecret() });
 
-  constructor(private readonly chat: ChatService) {}
+  constructor(
+    private readonly chat: ChatService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async handleConnection(client: Socket) {
-    // TODO: verify access_token từ handshake (query ?token= lần đầu / header);
-    // từ chối nếu không hợp lệ. Gắn userId vào client.data.
-    const userId = (client.handshake.auth?.userId ?? client.handshake.query?.userId) as string;
-    if (!userId) {
+    const raw = client.handshake.auth?.token as string | undefined;
+    const token =
+      raw && raw.startsWith('Bearer ') ? raw.slice(7) : (raw ?? '');
+    if (!token) {
       client.disconnect(true);
       return;
     }
-    client.data.userId = userId;
-    if (!this.connections.has(userId)) this.connections.set(userId, new Set());
-    this.connections.get(userId)!.add(client.id);
-  }
-
-  handleDisconnect(client: Socket) {
-    const userId = client.data?.userId as string | undefined;
-    if (userId) {
-      this.connections.get(userId)?.delete(client.id);
-      if (this.connections.get(userId)?.size === 0) this.connections.delete(userId);
+    try {
+      const payload = (await this.jwt.verifyAsync(token)) as {
+        sub?: string;
+      };
+      const userId = payload?.sub;
+      if (!userId) throw new Error('missing sub');
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      if (!user || user.status !== UserStatus.ACTIVE)
+        throw new Error('inactive user');
+      client.data.userId = userId;
+    } catch {
+      client.disconnect(true);
     }
   }
 
-  /** Client cập nhật token sau khi xoay vòng. */
-  @SubscribeMessage('auth')
-  handleAuth(@ConnectedSocket() client: Socket, @MessageBody() body: { token: string }) {
-    // TODO: verify token mới, cập nhật client.data.
-    return { ok: true };
+  handleDisconnect(_client: Socket) {
+    // Không cần dọn dẹp đặc biệt: socket.io tự rời khỏi các room.
   }
 
-  /** Client join room để nhận broadcast của conversation. */
-  @SubscribeMessage('room:join')
-  async handleJoinRoom(
+  private requireUserId(client: Socket): string {
+    const userId = client.data?.userId as string | undefined;
+    if (!userId) {
+      client.disconnect(true);
+      throw new Error('unauthenticated socket');
+    }
+    return userId;
+  }
+
+  /** Client join room của conversation để nhận broadcast. */
+  @SubscribeMessage('join')
+  async handleJoin(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { conversation_id: string },
+    @MessageBody() body: { conversationId: string },
   ) {
-    const userId = client.data.userId as string;
-    const ok = await this.chat.isMember(body.conversation_id, userId);
-    if (!ok) return { error: { code: 'NOT_MEMBER', message: 'Không phải thành viên' } };
-    await client.join(`conv:${body.conversation_id}`);
+    const userId = this.requireUserId(client);
+    const ok = await this.chat.isMember(body.conversationId, userId);
+    if (!ok)
+      return {
+        ok: false,
+        error: {
+          code: 'NOT_CONVERSATION_MEMBER',
+          message: 'Bạn không phải thành viên của cuộc trò chuyện này',
+        },
+      };
+    await client.join(`conv:${body.conversationId}`);
     return { ok: true };
   }
 
-  /** Gửi tin nhắn qua WS — persist trước khi ack/broadcast (HNT-T-012). */
-  @SubscribeMessage('message:send')
+  /** Gửi tin nhắn qua WS — persist trước khi broadcast (HNT-T-012). */
+  @SubscribeMessage('send_message')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: SendMessageDto & { conversation_id: string },
+    @MessageBody()
+    body: {
+      conversationId: string;
+      clientMessageId: string;
+      type: string;
+      content?: string;
+      replyToId?: string;
+    },
   ) {
-    const userId = client.data.userId as string;
-    const { conversation_id, ...dto } = body;
-    const { data } = await this.chat.sendMessage(conversation_id, userId, dto as SendMessageDto);
-    const message = (data as { message: unknown }).message;
-    // Broadcast tới mọi thành viên trong room (trừ người gửi — client tự render).
-    client.to(`conv:${conversation_id}`).emit('message:new', {
-      conversation_id,
-      message,
-    });
-    // Ack cho người gửi (HNT-T-013: client giữ outbox đến khi nhận ack).
-    return {
-      event: 'message:ack',
-      data: { client_message_id: dto.clientMessageId, message_id: (message as { id: string }).id, status: 'sent' },
-    };
+    const userId = this.requireUserId(client);
+    const { conversationId, ...dto } = body;
+    const result = await this.chat.sendMessage(conversationId, userId, dto);
+    this.server
+      .to(`conv:${conversationId}`)
+      .emit('message:new', result.data.message);
+    return { ok: true, message: result.data.message };
   }
 
-  /** Typing — không gửi cho người lạ trong message_requests pending. */
-  @SubscribeMessage('typing:start')
-  handleTypingStart(@ConnectedSocket() client: Socket, @MessageBody() body: { conversation_id: string }) {
-    client.to(`conv:${body.conversation_id}`).emit('typing:start', {
-      conversation_id: body.conversation_id,
-      user_id: client.data.userId,
-    });
-  }
-
-  @SubscribeMessage('typing:stop')
-  handleTypingStop(@ConnectedSocket() client: Socket, @MessageBody() body: { conversation_id: string }) {
-    client.to(`conv:${body.conversation_id}`).emit('typing:stop', {
-      conversation_id: body.conversation_id,
-      user_id: client.data.userId,
-    });
-  }
-
-  /** Reconnect: client gửi sync kèm last_message_id để lấy phần thiếu. */
-  @SubscribeMessage('sync')
-  async handleSync(
-    @ConnectedSocket() _client: Socket,
-    @MessageBody() body: { conversation_id: string; last_message_id: string },
+  /** Trạng thái đang gõ — broadcast tới room trừ người gửi. */
+  @SubscribeMessage('typing')
+  handleTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { conversationId: string; isTyping: boolean },
   ) {
-    // TODO: trả messages sau last_message_id (dùng GET /conversations/:id/messages?after=).
-    return { messages: [] };
+    const userId = this.requireUserId(client);
+    client.to(`conv:${body.conversationId}`).emit('typing', {
+      conversationId: body.conversationId,
+      userId,
+      isTyping: !!body.isTyping,
+    });
+    return { ok: true };
   }
 
-  /** Helper: server phát notification:new tới mọi thiết bị của user. */
-  emitToUser(userId: string, event: string, payload: unknown) {
-    const sockets = this.connections.get(userId);
-    if (!sockets) return false; // offline → job nền gửi push FCM/APNs (dedup_key)
-    sockets.forEach((sid) => this.server.to(sid).emit(event, payload));
-    return true;
+  /** Đánh dấu đã đọc — persist rồi broadcast cho cả room. */
+  @SubscribeMessage('mark_read')
+  async handleMarkRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { conversationId: string; messageId: string },
+  ) {
+    const userId = this.requireUserId(client);
+    await this.chat.markRead(userId, body.conversationId, body.messageId);
+    this.server.to(`conv:${body.conversationId}`).emit('message:read', {
+      conversationId: body.conversationId,
+      userId,
+      messageId: body.messageId,
+    });
+    return { ok: true };
   }
 }
