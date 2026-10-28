@@ -11,9 +11,11 @@ Dự án dùng 2 Vercel project riêng (monorepo):
 
 - Entry: `services/api/api/index.ts` — khởi tạo NestJS một lần, giữ ấm giữa các invocation.
 - `services/api/vercel.json`:
-  - `buildCommand`: `prisma generate && prisma db push --accept-data-loss`
-    (đồng bộ schema lên database trong lúc build — DB còn mới nên an toàn;
-    khi schema ổn định có thể bỏ `db push` khỏi build).
+  - `buildCommand`: `prisma generate && npm run build && prisma db push --skip-generate`
+    (đồng bộ schema lên database trong lúc build). **Không dùng `--accept-data-loss`**:
+    nếu thay đổi schema có thể làm mất dữ liệu (xóa/đổi tên cột), build sẽ dừng
+    lại thay vì tự xóa dữ liệu production. Bước tiếp theo: chuyển sang
+    `prisma migrate deploy` với thư mục `prisma/migrations`.
   - `rewrites`: `/api/v1/*` → `/api` (giữ nguyên prefix `api/v1` của app).
 - Biến môi trường (đã cài trên Vercel): `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`.
 - **Giới hạn:** WebSocket chat realtime KHÔNG chạy trên serverless. Các API REST chạy bình thường.
