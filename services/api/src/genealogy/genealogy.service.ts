@@ -22,6 +22,7 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { CreateRelationshipDto } from './dto/create-relationship.dto';
 import { CreateProposalDto } from './dto/create-proposal.dto';
+import { DEMO_LINEAGE_ID } from '../common/demo';
 
 /**
  * GenealogyService — triển khai đầy đủ module Gia phả.
@@ -97,6 +98,8 @@ export class GenealogyService {
    * không đi qua LineageGuard nên phải kiểm tra ở đây.
    */
   private async effectivePerm(lineageId: string, userId: string): Promise<Perm> {
+    // Dòng họ mẫu: ai cũng chỉ được xem.
+    if (lineageId === DEMO_LINEAGE_ID) return { ...NO_PERM, canView: true };
     const [membership, lineage] = await Promise.all([
       this.prisma.lineageMembership.findFirst({
         where: { lineageId, userId, status: 'approved' },

@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { get, post, saveTokens } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
@@ -365,6 +366,10 @@ export default function DangNhapPage() {
           </>
         )}
       </div>
+      <p className="muted-text section-gap">
+        Chưa biết app làm được gì? <Link href="/mau">Xem dòng họ mẫu</Link>{" "}
+        — không cần đăng nhập.
+      </p>
     </>
   );
 }

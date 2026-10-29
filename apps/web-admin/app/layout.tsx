@@ -3,9 +3,9 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "HỌ NHÀ TÔI — Quản trị",
+  title: "Họ Nhà Tôi — Gia phả số của dòng họ",
   description:
-    "Web quản trị dành cho quản trị dòng họ và quản trị hệ thống, dùng chung API backend.",
+    "Gia phả số cho dòng họ Việt: cây gia phả theo đời, ngày giỗ âm lịch, tra vai vế xưng hô.",
 };
 
 export default function RootLayout({
