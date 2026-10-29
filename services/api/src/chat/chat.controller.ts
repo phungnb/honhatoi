@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -30,6 +31,14 @@ export class ChatController {
     @Body() dto: CreateConversationDto,
   ) {
     return this.chat.createConversation(userId, dto);
+  }
+
+  @Post('lineages/:lineageId/group')
+  ensureLineageGroup(
+    @CurrentUserId() userId: string,
+    @Param('lineageId', ParseUUIDPipe) lineageId: string,
+  ) {
+    return this.chat.ensureLineageGroup(userId, lineageId);
   }
 
   @Get('conversations')

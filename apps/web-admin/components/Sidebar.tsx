@@ -50,6 +50,8 @@ export default function Sidebar() {
     ? [
         { href: "/app", label: "Trang chủ", short: "Trang chủ", mobile: true },
         { href: "/app/gia-pha", label: "Gia phả", short: "Gia phả", mobile: true },
+        { href: "/app/tin-nhan", label: "Tin nhắn", short: "Tin nhắn", mobile: true },
+        { href: "/app/su-kien", label: "Sự kiện", short: "Sự kiện", mobile: true },
         {
           href: "/app/thong-bao",
           label: unread > 0 ? `Thông báo (${unread})` : "Thông báo",
@@ -57,7 +59,7 @@ export default function Sidebar() {
           mobile: false,
         },
         ...(manages || pathname.startsWith("/quan-ly")
-          ? [{ href: "/quan-ly", label: "Quản lý dòng họ", short: "Quản lý", mobile: true }]
+          ? [{ href: "/quan-ly", label: "Quản lý dòng họ", short: "Quản lý", mobile: false }]
           : []),
         ...(platformAdmin
           ? [{ href: "/super-admin", label: "Quản trị nền tảng", short: "Nền tảng", mobile: false }]

@@ -259,6 +259,50 @@ export class ChatService {
   }
 
   /**
+   * POST /chat/lineages/:lineageId/group — nhóm chat cả họ. Mỗi họ một
+   * nhóm: chưa có thì tạo với mọi thành viên đã duyệt; đã có thì thêm
+   * người gọi vào nếu chưa ở trong (người vào họ sau vẫn chat được).
+   */
+  async ensureLineageGroup(userId: string, lineageId: string) {
+    await this.requireApprovedLineageMember(lineageId, userId);
+    const existing = await this.prisma.chatConversation.findFirst({
+      where: { lineageId, type: ChatRoomType.LINEAGE_GROUP, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (existing) {
+      await this.prisma.conversationMember.upsert({
+        where: { conversationId_userId: { conversationId: existing.id, userId } },
+        create: { conversationId: existing.id, userId, role: 'member' },
+        update: { leftAt: null },
+      });
+      return { data: { conversation: existing, reused: true }, error: null };
+    }
+    const [lineage, approved] = await Promise.all([
+      this.prisma.lineage.findUnique({ where: { id: lineageId }, select: { name: true } }),
+      this.prisma.lineageMembership.findMany({
+        where: { lineageId, status: 'approved' },
+        select: { userId: true },
+      }),
+    ]);
+    const others = [...new Set(approved.map((a) => a.userId))].filter((id) => id !== userId);
+    const conversation = await this.prisma.chatConversation.create({
+      data: {
+        type: ChatRoomType.LINEAGE_GROUP,
+        lineageId,
+        title: `Cả họ · ${lineage?.name ?? ''}`.slice(0, 255),
+        createdBy: userId,
+        members: {
+          create: [
+            { userId, role: 'admin' },
+            ...others.map((id) => ({ userId: id, role: 'member' })),
+          ],
+        },
+      },
+    });
+    return { data: { conversation, reused: false }, error: null };
+  }
+
+  /**
    * GET /chat/conversations — các conversation user còn là thành viên,
    * kèm tin nhắn cuối + số tin chưa đọc, sắp xếp updatedAt desc, cursor paging.
    */
@@ -301,8 +345,15 @@ export class ChatService {
           NOT: { reads: { some: { userId } } },
         },
       });
+      // Tên thành viên để giao diện đặt tên chat 1-1 theo người kia.
+      const members = await this.prisma.conversationMember.findMany({
+        where: { conversationId: c.id, leftAt: null },
+        select: { userId: true, user: { select: { displayName: true } } },
+        take: 50,
+      });
       items.push({
         ...c,
+        members: members.map((m) => ({ userId: m.userId, displayName: m.user.displayName })),
         myRole: roleByConv.get(c.id) ?? 'member',
         lastMessage: lastMessage ? this.presentMessage(lastMessage) : null,
         unreadCount,
