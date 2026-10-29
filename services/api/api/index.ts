@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 import { AppModule } from '../dist/app.module';
+import { corsOrigins } from '../dist/common/cors';
 
 /**
  * Entry point cho Vercel Serverless Functions.
@@ -33,7 +34,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
   app.enableCors({
-    origin: (process.env.CORS_ORIGINS ?? '').split(',').filter(Boolean),
+    origin: corsOrigins(),
     credentials: true,
   });
   await app.init();
