@@ -546,7 +546,8 @@ tbody tr:hover {
     z-index: 20;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
-    padding: 10px 16px;
+    /* Tai thỏ / Dynamic Island khi chạy trong app hoặc PWA toàn màn hình */
+    padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
   }
   .shell {
     flex-direction: column;

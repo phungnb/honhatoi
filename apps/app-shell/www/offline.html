@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Họ Nhà Tôi — Không có mạng</title>
+  <style>
+    html,body{margin:0;height:100%;background:#0b0f14;color:#f2f5f9;font-family:system-ui,-apple-system,sans-serif}
+    main{min-height:100%;display:grid;place-items:center;padding:24px;text-align:center;box-sizing:border-box}
+    .mark{width:56px;height:56px;border-radius:16px;background:#a3ff12;color:#0b0f14;display:grid;place-items:center;font-weight:800;font-size:28px;margin:0 auto}
+    h1{font-size:20px;margin:16px 0 8px}p{color:#9aa4b5;font-size:14px;margin:0 0 24px;line-height:1.5}
+    button{background:#a3ff12;color:#0b0f14;border:0;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:700}
+  </style>
+</head>
+<body>
+  <main>
+    <div>
+      <div class="mark">H</div>
+      <h1>Không kết nối được Họ Nhà Tôi</h1>
+      <p>Điện thoại đang không có mạng hoặc máy chủ tạm thời không phản hồi.<br>Bật Wi-Fi / 4G rồi thử lại.</p>
+      <button onclick="location.href=window.HNT_URL||'/'">Thử lại</button>
+    </div>
+  </main>
+  <script>window.HNT_URL = 'https://honhatoi-web-admin.vercel.app/app'</script>
+</body>
+</html>

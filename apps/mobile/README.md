@@ -1,4 +1,9 @@
-# Họ Nhà Tôi — Mobile App (Flutter)
+# Họ Nhà Tôi — Mobile App (Flutter) — ĐÃ DỪNG
+
+> **Đã dừng phát triển (29/10/2026).** App Android/iOS nay là vỏ Capacitor mở
+> web app, cùng cách làm với RaceHub: xem `apps/app-shell/`. Mọi tính năng mới
+> làm ở `apps/web-admin`. Thư mục này giữ lại để tham khảo, không build, không
+> nộp cửa hàng.
 
 Khung ứng dụng Flutter cho dự án **HỌ NHÀ TÔI**: app gia phả số và cộng đồng
 dòng họ, chạy trên Android và iOS.
