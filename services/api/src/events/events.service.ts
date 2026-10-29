@@ -13,7 +13,7 @@ import {
   NotifyInput,
 } from '../notifications/notifications.service';
 
-const ADMIN_ROLES = ['ADMIN', 'SENIOR_ADMIN', 'SYSTEM_ADMIN'];
+const ADMIN_ROLES = ['ADMIN'];
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   ancestral_ceremony: 'Giỗ tổ',
@@ -65,7 +65,7 @@ export class EventsService {
     return event;
   }
 
-  /** Chỉ người tổ chức hoặc ADMIN+ của dòng họ được sửa/hủy sự kiện. */
+  /** Chỉ người tổ chức hoặc Ban quản trị của dòng họ được sửa/hủy sự kiện. */
   private async requireOrganizerOrAdmin(
     lineageId: string,
     userId: string,

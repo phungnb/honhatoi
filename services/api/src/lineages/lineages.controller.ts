@@ -16,6 +16,7 @@ import { JoinRequestDto } from './dto/join-request.dto';
 import { ChangeMemberRoleDto } from './dto/change-member-role.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { JoinByCodeDto } from './dto/join-by-code.dto';
+import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { LineageGuard } from '../common/guards/lineage.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
@@ -141,6 +142,16 @@ export class LineagesController {
     @Body() dto: ChangeMemberRoleDto,
   ) {
     return this.lineages.changeRole(lineageId, adminId, targetUserId, dto.role);
+  }
+
+  @Post(':lineageId/transfer-ownership')
+  @UseGuards(LineageGuard)
+  transferOwnership(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: TransferOwnershipDto,
+  ) {
+    return this.lineages.transferOwnership(lineageId, userId, dto.userId);
   }
 
   @Delete(':lineageId/members/:userId')

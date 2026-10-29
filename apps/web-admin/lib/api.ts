@@ -93,3 +93,6 @@ export const put = <T>(path: string, body: unknown): Promise<T> =>
 
 export const del = <T>(path: string): Promise<T> =>
   api<T>(path, { method: "DELETE" });
+
+export const patch = <T>(path: string, body: unknown): Promise<T> =>
+  api<T>(path, { method: "PATCH", body: JSON.stringify(body) });

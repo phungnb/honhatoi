@@ -33,13 +33,14 @@ async function main() {
       ancestralHallAddress: 'Nhà thờ họ Nguyễn, ấp Tân Lập, Đồng Nai',
       visibility: 'invite_only',
       createdBy: admin.id,
+      ownerUserId: admin.id,
     },
   });
   await prisma.lineageMembership.create({
     data: {
       lineageId: nguyen.id,
       userId: admin.id,
-      role: LineageRole.SENIOR_ADMIN,
+      role: LineageRole.ADMIN,
       status: 'approved',
       joinedAt: new Date(),
     },
@@ -138,13 +139,14 @@ async function main() {
       ancestralHallAddress: 'Nhà thờ họ Trần, phường Bình Thọ, TP. Hồ Chí Minh',
       visibility: 'invite_only',
       createdBy: admin.id,
+      ownerUserId: admin.id,
     },
   });
   await prisma.lineageMembership.create({
     data: {
       lineageId: tran.id,
       userId: admin.id,
-      role: LineageRole.SENIOR_ADMIN,
+      role: LineageRole.ADMIN,
       status: 'approved',
       joinedAt: new Date(),
     },

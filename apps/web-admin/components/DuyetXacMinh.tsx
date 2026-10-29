@@ -12,10 +12,8 @@
  * - Diff View: với đề xuất sửa hồ sơ, so sánh trực quan từng trường
  *   (thông tin cũ bên trái, thông tin mới bên phải).
  * Sau khi duyệt, backend tự gửi thông báo cho toàn bộ thành viên của họ.
- * - Hai chế độ: chọn họ từ dropdown (trang cũ /duyet-xac-minh) hoặc
- *   khóa họ từ URL (route mới /admin/[lineageId]/duyet-xac-minh theo
- *   cấu trúc 1 domain của đánh giá chuyên gia — Trưởng tộc làm việc
- *   đúng trong không gian của họ mình).
+ * - Dùng bên trong cổng /quan-ly/[lineageId] (họ khóa theo URL); vẫn
+ *   hỗ trợ chế độ chọn họ từ dropdown khi không truyền lockedLineageId.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -134,8 +132,11 @@ function snapshotRows(
 
 export default function DuyetXacMinh({
   lockedLineageId,
+  embedded = false,
 }: {
   lockedLineageId?: string;
+  /** Nằm trong cổng /quan-ly: ẩn tiêu đề trang và tên họ (đã có ở trên). */
+  embedded?: boolean;
 }) {
   const [lineages, setLineages] = useState<Lineage[]>([]);
   const [lineageId, setLineageId] = useState(lockedLineageId ?? "");
@@ -244,14 +245,16 @@ export default function DuyetXacMinh({
 
   return (
     <>
-      <div className="page-head">
-        <h1 className="page-title">Duyệt xác minh gia phả</h1>
-        <p className="page-desc">
-          Xét duyệt các đề xuất thêm hoặc sửa thành viên trong cây gia phả.
-          Đề xuất được duyệt mới cập nhật vào cơ sở dữ liệu; đề xuất bị từ
-          chối phải kèm lý do giải thích.
-        </p>
-      </div>
+      {!embedded && (
+        <div className="page-head">
+          <h1 className="page-title">Duyệt xác minh gia phả</h1>
+          <p className="page-desc">
+            Xét duyệt các đề xuất thêm hoặc sửa thành viên trong cây gia phả.
+            Đề xuất được duyệt mới cập nhật vào cơ sở dữ liệu; đề xuất bị từ
+            chối phải kèm lý do giải thích.
+          </p>
+        </div>
+      )}
 
       {notice && (
         <div className="card section-gap">
@@ -264,8 +267,8 @@ export default function DuyetXacMinh({
         </div>
       )}
 
-      <div className="btn-row section-gap">
-        {lockedLineageId ? (
+      <div className="btn-row section-gap" style={{ flexWrap: "wrap" }}>
+        {embedded ? null : lockedLineageId ? (
           <p className="muted-text">
             Dòng họ:{" "}
             <strong style={{ color: "var(--text)" }}>

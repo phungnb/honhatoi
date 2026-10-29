@@ -25,11 +25,7 @@ const TYPE_MAP: Record<string, ChatRoomType> = {
 };
 
 /** Vai trò được coi là quản trị dòng họ (dùng cho quyền quản lý conversation). */
-const LINEAGE_ADMIN_ROLES: LineageRole[] = [
-  LineageRole.ADMIN,
-  LineageRole.SENIOR_ADMIN,
-  LineageRole.SYSTEM_ADMIN,
-];
+const LINEAGE_ADMIN_ROLES: LineageRole[] = [LineageRole.ADMIN];
 
 @Injectable()
 export class ChatService {

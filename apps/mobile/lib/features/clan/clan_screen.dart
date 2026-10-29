@@ -139,7 +139,10 @@ class ClanScreen extends ConsumerWidget {
               border: Border.all(color: p.brand),
             ),
             child: Text(
-              lineageRoleLabel(lineage['myRole'] as String?),
+              lineageRoleLabel(
+                lineage['myRole'] as String?,
+                isOwner: lineage['isOwner'] == true,
+              ),
               style: TextStyle(
                 color: p.brand,
                 fontSize: 11,

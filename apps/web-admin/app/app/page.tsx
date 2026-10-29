@@ -15,12 +15,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
+import { MyLineage, canManageLineage, roleLabel } from "@/lib/roles";
 
-interface Lineage {
-  id: string;
-  name: string;
-  role?: string;
-}
+type Lineage = MyLineage;
 
 interface TreePerson {
   id: string;
@@ -183,6 +180,8 @@ export default function AppHomePage() {
     return a - b;
   });
 
+  const currentLineage = lineages.find((l) => l.id === lineageId);
+
   return (
     <>
       <div className="page-head">
@@ -217,7 +216,7 @@ export default function AppHomePage() {
             {lineages.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
-                {l.role ? ` — ${l.role}` : ""}
+                {` — ${roleLabel(l.myRole, l.isOwner)}`}
               </option>
             ))}
           </select>
@@ -406,13 +405,12 @@ export default function AppHomePage() {
         )}
       </div>
 
-      {lineageId && (
+      {currentLineage && canManageLineage(currentLineage) && (
         <p className="muted-text section-gap">
-          Là Trưởng tộc hoặc Trưởng chi của họ này? Vào cổng Ban Trị sự:{" "}
-          <Link href={`/admin/${lineageId}/duyet-xac-minh`}>
-            /admin/{lineageId}/duyet-xac-minh
-          </Link>{" "}
-          — cùng một lần đăng nhập, không cần đăng nhập lại.
+          Bạn là {roleLabel(currentLineage.myRole, currentLineage.isOwner)} của
+          họ này:{" "}
+          <Link href={`/quan-ly/${currentLineage.id}`}>vào Quản lý dòng họ</Link>{" "}
+          — cùng một lần đăng nhập.
         </p>
       )}
     </>

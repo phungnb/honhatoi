@@ -8,6 +8,7 @@ import {
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LineageRole, Prisma } from '@prisma/client';
+import { Actor, LineageAction, can } from '../common/permissions';
 import { CreateLineageDto } from './dto/create-lineage.dto';
 import { UpdateLineageDto } from './dto/update-lineage.dto';
 
@@ -16,19 +17,16 @@ import { UpdateLineageDto } from './dto/update-lineage.dto';
  *
  * - Mọi thao tác đọc/ghi đều gắn lineageId cụ thể; LineageGuard đảm bảo user là
  *   thành viên được duyệt (cô lập dữ liệu giữa các họ — HNT-T-010).
- * - Phân vai trò theo LineageRole (7 giá trị); kiểm tra thứ bậc khi duyệt
- *   thành viên / đổi vai trò / xóa thành viên; bảo vệ quản trị cấp cao cuối cùng.
+ * - 3 vai trò (MEMBER, EDITOR, ADMIN) + Trưởng tộc (lineages.owner_user_id),
+ *   kiểm tra qua can() trong common/permissions.ts. Trưởng tộc luôn tồn tại
+ *   đúng một người mỗi họ: không bị xóa/hạ, muốn rời phải chuyển giao trước.
  */
 
-const ROLE_RANK: Record<string, number> = {
-  GUEST: 0,
-  APP_MEMBER: 1,
-  MEMBER: 2,
-  GENEALOGY_MANAGER: 3,
-  ADMIN: 4,
-  SENIOR_ADMIN: 5,
-  SYSTEM_ADMIN: 6,
-};
+const ASSIGNABLE_ROLES: string[] = [
+  LineageRole.MEMBER,
+  LineageRole.EDITOR,
+  LineageRole.ADMIN,
+];
 
 @Injectable()
 export class LineagesService {
@@ -49,31 +47,51 @@ export class LineagesService {
     return m;
   }
 
-  /** Yêu cầu vai trò tối thiểu trong dòng họ. */
-  private async requireRole(lineageId: string, userId: string, minRole: string) {
-    const m = await this.membershipOrThrow(lineageId, userId);
-    const rank = ROLE_RANK[m.role as string] ?? -1;
-    if (rank < (ROLE_RANK[minRole] ?? 99))
+  /** Membership + vai trò hiệu lực (kèm cờ Trưởng tộc) của user trong họ. */
+  private async actorOrThrow(lineageId: string, userId: string) {
+    const [m, lineage] = await Promise.all([
+      this.membershipOrThrow(lineageId, userId),
+      this.prisma.lineage.findUnique({
+        where: { id: lineageId },
+        select: { ownerUserId: true },
+      }),
+    ]);
+    const actor: Actor = {
+      role: m.role,
+      isOwner: lineage?.ownerUserId === userId,
+    };
+    return { membership: m, actor, ownerUserId: lineage?.ownerUserId ?? null };
+  }
+
+  private async requirePerm(
+    lineageId: string,
+    userId: string,
+    action: LineageAction,
+  ) {
+    const ctx = await this.actorOrThrow(lineageId, userId);
+    if (!can(ctx.actor, action))
       throw new ForbiddenException({
         code: 'REQUIRED_ROLE',
-        message: `Thao tác này yêu cầu vai trò từ ${minRole} trở lên`,
+        message:
+          action === 'owner'
+            ? 'Thao tác này chỉ Trưởng tộc (người sở hữu dòng họ) được làm'
+            : 'Bạn không có quyền thực hiện thao tác này trong dòng họ',
       });
-    return m;
+    return ctx;
   }
 
   private assertValidRole(role: string) {
-    if (!(role in ROLE_RANK))
+    if (!ASSIGNABLE_ROLES.includes(role))
       throw new BadRequestException({
         code: 'INVALID_ROLE',
-        message: `Vai trò không hợp lệ: ${role}`,
+        message: `Vai trò không hợp lệ: ${role} (chỉ nhận MEMBER, EDITOR, ADMIN)`,
       });
   }
 
   /**
    * Thu hồi mọi quyền còn sót khi một người không còn là thành viên họ:
-   * bản ghi genealogy_permissions (theo họ và theo từng hồ sơ) và tư cách
-   * thành viên trong các nhóm chat gắn với họ. Gọi trong cùng transaction
-   * với việc xóa membership.
+   * bản ghi genealogy_permissions cũ và tư cách thành viên trong các nhóm
+   * chat gắn với họ. Gọi trong cùng transaction với việc xóa membership.
    */
   private async revokeLineageAccess(
     tx: Prisma.TransactionClient,
@@ -87,23 +105,12 @@ export class LineagesService {
     });
   }
 
-  /** Chỉ được thao tác lên người có vai trò THẤP HƠN mình (trừ chính mình). */
-  private assertOutranks(actorRole: string, targetRole: string) {
-    if ((ROLE_RANK[targetRole] ?? 0) >= (ROLE_RANK[actorRole] ?? 0))
-      throw new ForbiddenException({
-        code: 'TARGET_RANK_TOO_HIGH',
-        message:
-          'Không thể thay đổi hoặc xóa người có vai trò ngang hoặc cao hơn bạn',
-      });
-  }
-
-  /** SYSTEM_ADMIN là quyền nền tảng — không cấp qua API dòng họ. */
-  private assertAssignableRole(role: string) {
-    if (role === 'SYSTEM_ADMIN')
-      throw new ForbiddenException({
-        code: 'ROLE_NOT_ASSIGNABLE',
-        message: 'Vai trò quản trị hệ thống không thể cấp qua dòng họ',
-      });
+  private ownerForbidden(): never {
+    throw new ForbiddenException({
+      code: 'OWNER_PROTECTED',
+      message:
+        'Không thể thay đổi hoặc xóa Trưởng tộc — Trưởng tộc cần chuyển giao quyền sở hữu trước',
+    });
   }
 
   private async audit(
@@ -129,21 +136,19 @@ export class LineagesService {
   // ---------------------------------------------------------------- create
 
   /**
-   * POST /lineages — tạo dòng họ; người tạo thành SENIOR_ADMIN, tất cả trong
-   * một transaction. Quyền gia phả suy ra từ vai trò (roleDefaultPerm) —
-   * không tạo bản ghi genealogy_permissions mặc định nữa, vì bản ghi đó
-   * "thắng" vai trò và lệch khi đổi vai trò.
+   * POST /lineages — tạo dòng họ; người tạo thành ADMIN + Trưởng tộc
+   * (ownerUserId), tất cả trong một transaction.
    */
   async create(userId: string, dto: CreateLineageDto) {
     const result = await this.prisma.$transaction(async (tx) => {
       const lineage = await tx.lineage.create({
-        data: { ...dto, createdBy: userId },
+        data: { ...dto, createdBy: userId, ownerUserId: userId },
       });
       await tx.lineageMembership.create({
         data: {
           lineageId: lineage.id,
           userId,
-          role: LineageRole.SENIOR_ADMIN,
+          role: LineageRole.ADMIN,
           status: 'approved',
           joinedAt: new Date(),
         },
@@ -183,6 +188,7 @@ export class LineagesService {
         lineages: page.map((m) => ({
           ...(m.lineage as object),
           myRole: m.role,
+          isOwner: m.lineage.ownerUserId === userId,
           joinedAt: m.joinedAt,
         })),
         next_cursor: hasMore ? page[page.length - 1].id : null,
@@ -215,9 +221,9 @@ export class LineagesService {
     };
   }
 
-  /** PATCH /lineages/:id — cần ADMIN trở lên. */
+  /** PATCH /lineages/:id — Ban quản trị trở lên. */
   async update(lineageId: string, userId: string, dto: UpdateLineageDto) {
-    await this.requireRole(lineageId, userId, 'ADMIN');
+    await this.requirePerm(lineageId, userId, 'members.manage');
     const lineage = await this.prisma.lineage.update({
       where: { id: lineageId },
       data: { ...dto },
@@ -227,11 +233,11 @@ export class LineagesService {
   }
 
   /**
-   * DELETE /lineages/:id — SENIOR_ADMIN+; xóa mềm.
+   * DELETE /lineages/:id — chỉ Trưởng tộc; xóa mềm.
    * Còn hồ sơ gia phả → 422 (bảo toàn dữ liệu, FK RESTRICT).
    */
   async remove(lineageId: string, userId: string) {
-    await this.requireRole(lineageId, userId, 'SENIOR_ADMIN');
+    await this.requirePerm(lineageId, userId, 'owner');
     const personCount = await this.prisma.familyPerson.count({
       where: { lineageId, deletedAt: null },
     });
@@ -256,6 +262,10 @@ export class LineagesService {
     query: { cursor?: string; limit?: number; branch?: string },
   ) {
     const take = Math.min(Math.max(query.limit ?? 30, 1), 100);
+    const lineage = await this.prisma.lineage.findUnique({
+      where: { id: lineageId },
+      select: { ownerUserId: true },
+    });
     const members = await this.prisma.lineageMembership.findMany({
       where: {
         lineageId,
@@ -276,6 +286,7 @@ export class LineagesService {
         members: page.map((m) => ({
           userId: m.userId,
           role: m.role,
+          isOwner: m.userId === lineage?.ownerUserId,
           branch: m.requestedBranch,
           joinedAt: m.joinedAt,
           user: m.user,
@@ -322,9 +333,9 @@ export class LineagesService {
     return { data: { membership }, error: null };
   }
 
-  /** GET /lineages/:id/join-requests — hàng đợi chờ duyệt (ADMIN+). */
+  /** GET /lineages/:id/join-requests — hàng đợi chờ duyệt (Ban quản trị). */
   async listJoinRequests(lineageId: string, userId: string) {
-    await this.requireRole(lineageId, userId, 'ADMIN');
+    await this.requirePerm(lineageId, userId, 'members.manage');
     const requests = await this.prisma.lineageMembership.findMany({
       where: { lineageId, status: 'pending' },
       include: {
@@ -337,9 +348,9 @@ export class LineagesService {
   }
 
   /**
-   * POST /lineages/:id/join-requests/:rid/approve|reject — ADMIN+.
-   * Duyệt: gán vai trò (không vượt quá vai trò người duyệt), ghi audit —
-   * trong transaction. Quyền gia phả suy ra từ vai trò.
+   * POST /lineages/:id/join-requests/:rid/approve|reject — Ban quản trị.
+   * Duyệt: gán MEMBER/EDITOR (gán ADMIN chỉ Trưởng tộc), ghi audit — trong
+   * transaction. Quyền gia phả suy ra từ vai trò.
    */
   async reviewJoin(
     lineageId: string,
@@ -348,7 +359,11 @@ export class LineagesService {
     approve: boolean,
     role?: string,
   ) {
-    const reviewer = await this.requireRole(lineageId, reviewerId, 'ADMIN');
+    const reviewer = await this.requirePerm(
+      lineageId,
+      reviewerId,
+      'members.manage',
+    );
 
     const request = await this.prisma.lineageMembership.findUnique({
       where: { id: requestId },
@@ -380,13 +395,12 @@ export class LineagesService {
       return { data: { membership: rejected }, error: null };
     }
 
-    const newRole = role ?? 'MEMBER';
+    const newRole = role ?? LineageRole.MEMBER;
     this.assertValidRole(newRole);
-    this.assertAssignableRole(newRole);
-    if ((ROLE_RANK[newRole] ?? 0) > (ROLE_RANK[reviewer.role as string] ?? 0))
+    if (newRole === LineageRole.ADMIN && !can(reviewer.actor, 'owner'))
       throw new ForbiddenException({
         code: 'ROLE_ESCALATION_FORBIDDEN',
-        message: 'Không thể gán vai trò cao hơn vai trò của chính bạn',
+        message: 'Chỉ Trưởng tộc được gán vai trò Ban quản trị',
       });
 
     const membership = await this.prisma.$transaction(async (tx) => {
@@ -415,8 +429,10 @@ export class LineagesService {
   }
 
   /**
-   * PATCH /lineages/:id/members/:userId/role — đổi vai trò (ADMIN+).
-   * Không gán vai trò cao hơn mình; bảo vệ quản trị cấp cao cuối cùng.
+   * PATCH /lineages/:id/members/:userId/role — đổi vai trò.
+   * - MEMBER ↔ EDITOR: Ban quản trị.
+   * - Cấp/thu ADMIN: chỉ Trưởng tộc.
+   * - Trưởng tộc không bị đổi vai trò (dùng chuyển quyền sở hữu).
    */
   async changeRole(
     lineageId: string,
@@ -424,14 +440,12 @@ export class LineagesService {
     targetUserId: string,
     role: string,
   ) {
-    const admin = await this.requireRole(lineageId, adminId, 'ADMIN');
     this.assertValidRole(role);
-    this.assertAssignableRole(role);
-    if ((ROLE_RANK[role] ?? 0) > (ROLE_RANK[admin.role as string] ?? 0))
-      throw new ForbiddenException({
-        code: 'ROLE_ESCALATION_FORBIDDEN',
-        message: 'Không thể gán vai trò cao hơn vai trò của chính bạn',
-      });
+    const { actor, ownerUserId } = await this.requirePerm(
+      lineageId,
+      adminId,
+      'roles.editor',
+    );
     const target = await this.prisma.lineageMembership.findUnique({
       where: { lineageId_userId: { lineageId, userId: targetUserId } },
     });
@@ -440,32 +454,15 @@ export class LineagesService {
         code: 'MEMBER_NOT_FOUND',
         message: 'Không tìm thấy thành viên',
       });
-    if (targetUserId !== adminId)
-      this.assertOutranks(admin.role as string, target.role as string);
-    // Bảo vệ quản trị cấp cao cuối cùng — áp dụng cho MỌI người bị hạ,
-    // không chỉ khi tự hạ chính mình.
+    if (targetUserId === ownerUserId) this.ownerForbidden();
     if (
-      (ROLE_RANK[target.role as string] ?? 0) >= ROLE_RANK['SENIOR_ADMIN'] &&
-      (ROLE_RANK[role] ?? 0) < ROLE_RANK['SENIOR_ADMIN']
-    ) {
-      const seniors = await this.prisma.lineageMembership.count({
-        where: {
-          lineageId,
-          status: 'approved',
-          role: { in: ['SENIOR_ADMIN', 'SYSTEM_ADMIN'] },
-          NOT: { userId: targetUserId },
-        },
+      (role === LineageRole.ADMIN || target.role === LineageRole.ADMIN) &&
+      !can(actor, 'owner')
+    )
+      throw new ForbiddenException({
+        code: 'ROLE_ESCALATION_FORBIDDEN',
+        message: 'Chỉ Trưởng tộc được cấp hoặc thu vai trò Ban quản trị',
       });
-      if (seniors === 0)
-        throw new ForbiddenException({
-          code: 'LAST_SENIOR_ADMIN',
-          message:
-            'Đây là quản trị cấp cao cuối cùng — hãy chuyển giao trước khi hạ vai trò',
-        });
-    }
-    // Xóa bản ghi quyền gia phả cấp họ để quyền suy lại theo vai trò mới
-    // (trước đây bản ghi cũ "thắng" vai trò: nâng lên ADMIN vẫn không duyệt
-    // được, hạ xuống MEMBER vẫn giữ toàn quyền).
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.genealogyPermission.deleteMany({
         where: { lineageId, userId: targetUserId, personId: null },
@@ -487,11 +484,61 @@ export class LineagesService {
   }
 
   /**
-   * DELETE /lineages/:id/members/:userId — xóa thành viên (ADMIN+).
-   * Không được xóa quản trị cấp cao cuối cùng; tự rời họ dùng /leave.
+   * POST /lineages/:id/transfer-ownership — Trưởng tộc chuyển quyền sở hữu
+   * cho một thành viên khác. Người nhận thành ADMIN; người cũ giữ ADMIN.
+   */
+  async transferOwnership(
+    lineageId: string,
+    ownerId: string,
+    targetUserId: string,
+  ) {
+    await this.requirePerm(lineageId, ownerId, 'owner');
+    if (targetUserId === ownerId)
+      throw new BadRequestException({
+        code: 'ALREADY_OWNER',
+        message: 'Bạn đang là Trưởng tộc',
+      });
+    const target = await this.prisma.lineageMembership.findUnique({
+      where: { lineageId_userId: { lineageId, userId: targetUserId } },
+    });
+    if (!target || target.status !== 'approved')
+      throw new NotFoundException({
+        code: 'MEMBER_NOT_FOUND',
+        message: 'Người nhận phải là thành viên đã được duyệt của họ',
+      });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lineage.update({
+        where: { id: lineageId },
+        data: { ownerUserId: targetUserId },
+      });
+      await tx.lineageMembership.update({
+        where: { id: target.id },
+        data: { role: LineageRole.ADMIN },
+      });
+      await tx.auditLog.create({
+        data: {
+          lineageId,
+          actorId: ownerId,
+          action: 'lineage.owner.transfer',
+          targetType: 'lineage',
+          targetId: lineageId,
+          metadata: { from: ownerId, to: targetUserId } as Prisma.InputJsonValue,
+        },
+      });
+    });
+    return { data: { ownerUserId: targetUserId }, error: null };
+  }
+
+  /**
+   * DELETE /lineages/:id/members/:userId — xóa thành viên (Ban quản trị).
+   * Không xóa được Trưởng tộc; xóa ADMIN cần Trưởng tộc; tự rời dùng /leave.
    */
   async removeMember(lineageId: string, adminId: string, targetUserId: string) {
-    const admin = await this.requireRole(lineageId, adminId, 'ADMIN');
+    const { actor, ownerUserId } = await this.requirePerm(
+      lineageId,
+      adminId,
+      'members.manage',
+    );
     if (targetUserId === adminId)
       throw new BadRequestException({
         code: 'USE_LEAVE_ENDPOINT',
@@ -505,22 +552,12 @@ export class LineagesService {
         code: 'MEMBER_NOT_FOUND',
         message: 'Không tìm thấy thành viên',
       });
-    this.assertOutranks(admin.role as string, target.role as string);
-    if ((ROLE_RANK[target.role as string] ?? 0) >= ROLE_RANK['SENIOR_ADMIN']) {
-      const seniors = await this.prisma.lineageMembership.count({
-        where: {
-          lineageId,
-          status: 'approved',
-          role: { in: ['SENIOR_ADMIN', 'SYSTEM_ADMIN'] },
-          NOT: { userId: targetUserId },
-        },
+    if (targetUserId === ownerUserId) this.ownerForbidden();
+    if (target.role === LineageRole.ADMIN && !can(actor, 'owner'))
+      throw new ForbiddenException({
+        code: 'TARGET_RANK_TOO_HIGH',
+        message: 'Chỉ Trưởng tộc được xóa thành viên Ban quản trị',
       });
-      if (seniors === 0)
-        throw new ForbiddenException({
-          code: 'LAST_SENIOR_ADMIN',
-          message: 'Không thể xóa quản trị cấp cao cuối cùng của dòng họ',
-        });
-    }
     await this.prisma.$transaction(async (tx) => {
       await tx.lineageMembership.delete({ where: { id: target.id } });
       await this.revokeLineageAccess(tx, lineageId, targetUserId);
@@ -548,21 +585,15 @@ export class LineagesService {
         code: 'MEMBER_NOT_FOUND',
         message: 'Bạn không phải thành viên của dòng họ này',
       });
-    if ((ROLE_RANK[membership.role as string] ?? 0) >= ROLE_RANK['SENIOR_ADMIN']) {
-      const seniors = await this.prisma.lineageMembership.count({
-        where: {
-          lineageId,
-          status: 'approved',
-          role: { in: ['SENIOR_ADMIN', 'SYSTEM_ADMIN'] },
-          NOT: { userId },
-        },
+    const lineage = await this.prisma.lineage.findUnique({
+      where: { id: lineageId },
+      select: { ownerUserId: true },
+    });
+    if (lineage?.ownerUserId === userId)
+      throw new ForbiddenException({
+        code: 'OWNER_MUST_TRANSFER',
+        message: 'Bạn là Trưởng tộc — hãy chuyển quyền sở hữu trước khi rời họ',
       });
-      if (seniors === 0)
-        throw new ForbiddenException({
-          code: 'LAST_SENIOR_ADMIN',
-          message: 'Bạn là quản trị cấp cao cuối cùng — hãy chuyển giao trước khi rời họ',
-        });
-    }
     await this.prisma.$transaction(async (tx) => {
       await tx.lineageMembership.delete({ where: { id: membership.id } });
       await this.revokeLineageAccess(tx, lineageId, userId);
@@ -572,13 +603,13 @@ export class LineagesService {
 
   // ---------------------------------------------------------------- invites
 
-  /** POST /lineages/:id/invites — tạo mã mời (ADMIN+). */
+  /** POST /lineages/:id/invites — tạo mã mời (Ban quản trị). */
   async createInvite(
     lineageId: string,
     userId: string,
     opts: { maxUses?: number; expiresInHours?: number },
   ) {
-    await this.requireRole(lineageId, userId, 'ADMIN');
+    await this.requirePerm(lineageId, userId, 'members.manage');
     const code = randomBytes(6).toString('hex').toUpperCase();
     const invite = await this.prisma.lineageInvite.create({
       data: {
@@ -631,7 +662,7 @@ export class LineagesService {
         data: {
           lineageId,
           userId,
-          role: 'MEMBER' as LineageRole,
+          role: LineageRole.MEMBER,
           status: 'approved',
           joinedAt: new Date(),
         },

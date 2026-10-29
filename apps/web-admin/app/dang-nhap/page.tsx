@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Đăng nhập cổng Ban Trị sự bằng OTP qua số điện thoại (cùng luồng auth
+ * Đăng nhập (một lần cho cả quản lý và con cháu) bằng OTP qua số điện thoại (cùng luồng auth
  * với app mobile). Sau khi đăng nhập, token được lưu để lib/api.ts dùng
  * cho mọi trang quản trị.
  */
@@ -9,7 +9,8 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { post, saveTokens } from "@/lib/api";
+import { get, post, saveTokens } from "@/lib/api";
+import { MyLineage, canManageLineage } from "@/lib/roles";
 
 export default function DangNhapPage() {
   const router = useRouter();
@@ -53,7 +54,12 @@ export default function DangNhapPage() {
       const access = body?.data?.accessToken;
       if (!access) throw new Error("Máy chủ không trả về token.");
       saveTokens(access, body.data?.refreshToken);
-      router.push("/duyet-xac-minh");
+      // Có vai trò quản lý ở ít nhất 1 họ → cổng quản lý; còn lại → con cháu.
+      const mine = await get<{ data?: { lineages?: MyLineage[] } }>(
+        "/lineages?limit=100",
+      ).catch(() => null);
+      const manages = (mine?.data?.lineages ?? []).some(canManageLineage);
+      router.push(manages ? "/quan-ly" : "/app");
     } catch (e) {
       setError(
         `Đăng nhập thất bại: ${e instanceof Error ? e.message : "lỗi không xác định"}`,
@@ -77,7 +83,7 @@ export default function DangNhapPage() {
   return (
     <>
       <div className="page-head">
-        <h1 className="page-title">Đăng nhập cổng Ban Trị sự</h1>
+        <h1 className="page-title">Đăng nhập Họ Nhà Tôi</h1>
         <p className="page-desc">
           Dùng số điện thoại đã đăng ký trong dòng họ. Mã xác thực gồm 6 số
           (hiện tại mã chỉ lưu trong hệ thống, chưa gửi qua SMS).
