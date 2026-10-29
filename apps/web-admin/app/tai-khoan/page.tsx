@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { get, getAccessToken, post } from "@/lib/api";
+import { clearTokens, get, getAccessToken, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 import MatKhauEmail from "@/components/MatKhauEmail";
 
@@ -105,6 +105,20 @@ export default function TaiKhoanPage() {
     }
   }
 
+  async function logout() {
+    // sessionId nằm trong access token (JWT) — để đăng xuất đúng phiên này.
+    try {
+      const payload = JSON.parse(
+        atob((getAccessToken() ?? "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+      ) as { sessionId?: string };
+      if (payload.sessionId) await post("/auth/logout", { sessionId: payload.sessionId });
+    } catch {
+      // token hỏng/hết hạn — vẫn xóa ở máy này
+    }
+    clearTokens();
+    window.location.href = "/app";
+  }
+
   if (loggedIn === false)
     return (
       <div>
@@ -118,7 +132,7 @@ export default function TaiKhoanPage() {
   return (
     <>
       <div className="page-head">
-        <h1 className="page-title">Tài khoản</h1>
+        <h1 className="page-title">Cá nhân</h1>
         <p className="page-desc">
           Số điện thoại: <strong>{phone ?? "chưa có"}</strong> · Email:{" "}
           <strong>{email ?? "chưa có"}</strong>. Đổi số hay thêm email vẫn
@@ -224,6 +238,14 @@ export default function TaiKhoanPage() {
           }}
         />
       )}
+      <div className="btn-row section-gap">
+        <Link className="btn" href="/mau">
+          Xem dòng họ mẫu
+        </Link>
+        <button className="btn danger-outline" onClick={() => void logout()}>
+          Đăng xuất
+        </button>
+      </div>
     </>
   );
 }

@@ -76,6 +76,11 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
   const [me, setMe] = useState<MyLineage | null>(null);
   const [myUserId, setMyUserId] = useState<string>("");
   const [tab, setTab] = useState<Tab>("tree");
+  // Mở thẳng một tab từ link, VD /quan-ly/:id?tab=invites (từ Trang chủ).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "invites" || t === "members" || t === "requests" || t === "proposals") setTab(t);
+  }, []);
   const [state, setState] = useState<"loading" | "ready" | "unauthorized" | "forbidden">("loading");
 
   useEffect(() => {

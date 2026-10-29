@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   NotFoundException,
+  Param,
+  ParseUUIDPipe,
   Query,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -67,5 +69,20 @@ export class DemoController {
         message: 'Cần đủ tham số from và to',
       });
     return this.genealogy.kinship(DEMO_LINEAGE_ID, '', from, to);
+  }
+
+  @Get('persons/:id')
+  async person(@Param('id', ParseUUIDPipe) id: string) {
+    // Chỉ người thuộc họ mẫu; id họ khác trả 404 như không tồn tại.
+    const found = await this.prisma.familyPerson.findFirst({
+      where: { id, lineageId: DEMO_LINEAGE_ID, deletedAt: null },
+      select: { id: true },
+    });
+    if (!found)
+      throw new NotFoundException({
+        code: 'PERSON_NOT_FOUND',
+        message: 'Không tìm thấy người này trong dòng họ mẫu',
+      });
+    return this.genealogy.findPerson(id, '');
   }
 }
