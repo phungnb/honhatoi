@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { post, saveTokens } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import { isInApp } from "@/lib/native";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
@@ -64,6 +65,8 @@ export default function DangNhapPage() {
   const [displayName, setDisplayName] = useState("");
 
   const googleBtn = useRef<HTMLDivElement>(null);
+  // Google không cho đăng nhập trong WebView của app (disallowed_useragent).
+  const [showGoogle, setShowGoogle] = useState(!!GOOGLE_CLIENT_ID);
 
   async function finishLogin(body: TokenBody) {
     const access = body?.data?.accessToken;
@@ -95,6 +98,10 @@ export default function DangNhapPage() {
   // NEXT_PUBLIC_GOOGLE_CLIENT_ID.
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
+    if (isInApp()) {
+      setShowGoogle(false);
+      return;
+    }
     const render = () => {
       const id = window.google?.accounts?.id;
       if (!id || !googleBtn.current) return;
@@ -207,7 +214,7 @@ export default function DangNhapPage() {
       </div>
 
       <div className="card" style={{ maxWidth: 440 }}>
-        {GOOGLE_CLIENT_ID && (
+        {showGoogle && (
           <>
             <div ref={googleBtn} style={{ minHeight: 44 }} />
             <p

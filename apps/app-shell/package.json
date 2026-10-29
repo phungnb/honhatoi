@@ -1,0 +1,22 @@
+{
+  "name": "honhatoi-app-shell",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Vỏ app Android/iOS (Capacitor) mở web app Họ Nhà Tôi",
+  "scripts": {
+    "sync": "cap sync",
+    "android": "cap open android",
+    "ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/browser": "^7.0.5",
+    "@capacitor/core": "^7.6.9"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/cli": "^7.6.9",
+    "@capacitor/ios": "^7.6.9",
+    "typescript": "^5.6.3"
+  }
+}
