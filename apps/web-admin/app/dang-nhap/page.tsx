@@ -372,6 +372,10 @@ export default function DangNhapPage() {
         Chưa biết app làm được gì? <Link href="/mau">Xem dòng họ mẫu</Link>{" "}
         — không cần đăng nhập.
       </p>
+      <p className="muted-text" style={{ fontSize: 13 }}>
+        Đăng nhập nghĩa là bạn đồng ý với <Link href="/dieu-khoan">Điều khoản sử dụng</Link> và{" "}
+        <Link href="/quyen-rieng-tu">Chính sách quyền riêng tư</Link>.
+      </p>
     </>
   );
 }

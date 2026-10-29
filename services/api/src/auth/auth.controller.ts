@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Post,
@@ -59,6 +60,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUserId() userId: string) {
     return this.auth.me(userId);
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  deleteMe(@CurrentUserId() userId: string) {
+    return this.auth.deleteMe(userId);
   }
 
   @Post('phone/change/request')

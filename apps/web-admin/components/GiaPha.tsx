@@ -15,6 +15,7 @@ import { useLineages } from "@/lib/lineage";
 import { roleLabel } from "@/lib/roles";
 import HoSoNguoi from "@/components/HoSoNguoi";
 import GioSapToi from "@/components/GioSapToi";
+import CayNhanh, { CayRelationship } from "@/components/CayNhanh";
 
 interface TreePerson {
   id: string;
@@ -42,6 +43,9 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
   const lineage = demo ? demoLineage : member.current;
 
   const [persons, setPersons] = useState<TreePerson[]>([]);
+  const [relationships, setRelationships] = useState<CayRelationship[]>([]);
+  const [rootId, setRootId] = useState<string | null>(null);
+  const [view, setView] = useState<"cay" | "doi">("cay");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -70,11 +74,15 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
     setKinship(null);
     setFromId("");
     setToId("");
-    get<{ data?: { persons?: TreePerson[] } }>(
+    get<{
+      data?: { persons?: TreePerson[]; relationships?: CayRelationship[]; root?: { id: string } | null };
+    }>(
       demo ? "/demo/tree?generations=6" : `/genealogy/lineages/${lineage.id}/tree?generations=6`,
     )
       .then((b) => {
         setPersons(b?.data?.persons ?? []);
+        setRelationships(b?.data?.relationships ?? []);
+        setRootId(b?.data?.root?.id ?? null);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "lỗi không xác định"))
@@ -190,19 +198,27 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
         </label>
       )}
 
-      {(error || member.error) && (
+      {(error || (!demo && member.error)) && (
         <p className="section-gap" style={{ color: "var(--danger)" }}>
           {error ?? member.error}
         </p>
       )}
 
-      <input
-        className="field section-gap"
-        style={{ maxWidth: 420 }}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Tìm tên trong họ…"
-      />
+      <div className="btn-row section-gap" style={{ flexWrap: "wrap", alignItems: "center" }}>
+        <button className={`btn${view === "cay" && !q ? " primary" : ""}`} onClick={() => { setView("cay"); setSearch(""); }}>
+          Sơ đồ cây
+        </button>
+        <button className={`btn${view === "doi" || q ? " primary" : ""}`} onClick={() => setView("doi")}>
+          Theo đời
+        </button>
+        <input
+          className="field"
+          style={{ flex: "1 1 200px", minWidth: 0, maxWidth: 360, marginTop: 0 }}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Tìm tên trong họ…"
+        />
+      </div>
 
       {loading ? (
         <p className="muted-text section-gap">Đang tải…</p>
@@ -216,6 +232,10 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
             </>
           )}
         </p>
+      ) : view === "cay" && !q ? (
+        <div className="card section-gap">
+          <CayNhanh persons={persons} relationships={relationships} rootId={rootId} onOpen={setOpenId} />
+        </div>
       ) : (
         generations.map((g) => (
           <section key={g ?? "x"} className="section-gap">

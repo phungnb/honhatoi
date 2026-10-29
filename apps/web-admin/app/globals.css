@@ -619,3 +619,148 @@ tbody tr:hover {
     bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }
+
+/* Sơ đồ cây dạng nhánh (components/CayNhanh.tsx) */
+.cay-wrap {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.cay {
+  list-style: none;
+  margin: 0;
+  padding-left: 22px;
+  position: relative;
+}
+.cay.cay-root {
+  padding-left: 0;
+}
+.cay > li {
+  position: relative;
+  padding: 4px 0;
+}
+.cay:not(.cay-root) > li::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--border);
+}
+.cay:not(.cay-root) > li:last-child::before {
+  bottom: auto;
+  height: 26px;
+}
+.cay:not(.cay-root) > li::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 26px;
+  width: 12px;
+  border-top: 1px solid var(--border);
+}
+.cay-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cay-toggle {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+}
+.cay-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.cay-chip.female {
+  border-left-color: var(--warm);
+}
+.cay-chip.spouse {
+  border-style: dashed;
+  border-left-style: solid;
+}
+.cay-chip.dead strong {
+  opacity: 0.75;
+}
+.cay-chip .sub {
+  font-size: 12px;
+}
+.cay-chip:hover {
+  border-color: var(--brand);
+}
+
+/* Trang văn bản dài (components/TrangVanBan.tsx) */
+.van-ban {
+  max-width: 720px;
+  line-height: 1.65;
+}
+.van-ban h2 {
+  font-size: 17px;
+  margin: 24px 0 8px;
+}
+.van-ban p,
+.van-ban li {
+  color: var(--muted);
+}
+.van-ban ul {
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+.van-ban strong {
+  color: var(--text);
+}
+
+/* Trang giới thiệu (components/GioiThieu.tsx) */
+.hero {
+  padding: 28px 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: radial-gradient(120% 140% at 0% 0%, var(--brand-soft), transparent 60%), var(--surface);
+}
+.steps {
+  list-style: none;
+  counter-reset: buoc;
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+.steps li {
+  counter-increment: buoc;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+.steps li::before {
+  content: counter(buoc);
+  grid-row: span 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--bg);
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
