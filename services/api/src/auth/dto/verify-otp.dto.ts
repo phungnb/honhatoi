@@ -1,6 +1,8 @@
 import { IsOptional, IsPhoneNumber, IsString, Length } from 'class-validator';
+import { NormalizePhone } from '../../common/phone';
 
 export class VerifyOtpDto {
+  @NormalizePhone()
   @IsPhoneNumber('VN')
   phone: string;
 

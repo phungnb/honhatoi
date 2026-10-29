@@ -21,12 +21,17 @@ Dự án dùng 2 Vercel project riêng (monorepo):
       dừng build thay vì xóa dữ liệu. Bước tiếp theo: `prisma migrate deploy`.
   - `rewrites`: `/api/v1/*` → `/api` (giữ nguyên prefix `api/v1` của app).
 - Biến môi trường (đã cài trên Vercel): `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`.
+- Tùy chọn: `GOOGLE_CLIENT_ID` (OAuth Client ID loại Web của Google; nhiều ID
+  cách nhau bằng dấu phẩy) để bật đăng nhập Google. Không đặt thì
+  `/auth/google` trả 503.
 - **Giới hạn:** WebSocket chat realtime KHÔNG chạy trên serverless. Các API REST chạy bình thường.
 
 ## honhatoi-web-admin (web quản trị)
 
 - Next.js 14, deploy chuẩn.
 - Biến môi trường: `NEXT_PUBLIC_API_URL=https://honhatoi-api.vercel.app/api/v1`.
+- Tùy chọn: `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (cùng giá trị với API) — có thì
+  trang đăng nhập hiện nút Google. Đổi biến này cần deploy lại web.
 
 ## App Flutter
 
@@ -38,6 +43,9 @@ Không deploy lên Vercel (app di động). Build APK/IPA riêng để phân ph�
   `ADMIN` (Ban quản trị). Trưởng tộc = `lineages.owner_user_id`.
 - Quản trị nền tảng (`/super-admin`): bật bằng SQL, không có API cấp quyền:
   `UPDATE users SET is_platform_admin = true WHERE phone = '<số ĐT>';`
+- Đăng nhập: số điện thoại + OTP, email + mật khẩu (sai 5 lần khóa 15
+  phút), Google. Số điện thoại được chuẩn hóa về `+84…` ở máy chủ.
+  Quên mật khẩu: quản trị nền tảng đặt lại trong `/super-admin`.
 - Đổi số điện thoại giữ nguyên tài khoản (mọi quyền đi theo):
   - Tự đổi: web `/tai-khoan` hoặc app tab Cá nhân. Cần mã OTP của cả số cũ
     lẫn số mới; đổi xong các thiết bị khác bị đăng xuất.

@@ -79,7 +79,7 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
       person,
       onAddRelative: () async {
         final changed = await Navigator.of(context).push<bool>(
-          MaterialPageRoute<void>(
+          MaterialPageRoute<bool>(
             builder: (_) => AddPersonScreen(
               lineageId: lineageId,
               anchorPerson: person,
@@ -91,7 +91,7 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
       },
       onEdit: () async {
         final changed = await Navigator.of(context).push<bool>(
-          MaterialPageRoute<void>(
+          MaterialPageRoute<bool>(
             builder: (_) => AddPersonScreen(
               lineageId: lineageId,
               existingPerson: person,
@@ -125,7 +125,7 @@ class _GenealogyScreenState extends ConsumerState<GenealogyScreen> {
   /// Thêm người mới không gắn quan hệ (độc lập trong họ).
   Future<void> _addStandalone(String lineageId) async {
     final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<void>(
+      MaterialPageRoute<bool>(
         builder: (_) => AddPersonScreen(lineageId: lineageId),
       ),
     );

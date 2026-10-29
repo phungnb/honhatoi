@@ -12,6 +12,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { get, getAccessToken, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import MatKhauEmail from "@/components/MatKhauEmail";
 
 const inputStyle: CSSProperties = {
   display: "block",
@@ -27,6 +28,8 @@ const inputStyle: CSSProperties = {
 export default function TaiKhoanPage() {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [hasPassword, setHasPassword] = useState(false);
   const [newPhone, setNewPhone] = useState("");
   const [oldCode, setOldCode] = useState("");
   const [newCode, setNewCode] = useState("");
@@ -41,10 +44,20 @@ export default function TaiKhoanPage() {
       setLoggedIn(false);
       return;
     }
-    get<{ data?: { user?: { phone?: string | null } } }>("/auth/me")
+    get<{
+      data?: {
+        user?: {
+          phone?: string | null;
+          email?: string | null;
+          hasPassword?: boolean;
+        };
+      };
+    }>("/auth/me")
       .then((b) => {
         setLoggedIn(true);
         setPhone(b?.data?.user?.phone ?? null);
+        setEmail(b?.data?.user?.email ?? null);
+        setHasPassword(b?.data?.user?.hasPassword === true);
       })
       .catch(() => setLoggedIn(false));
   }, []);
@@ -107,9 +120,10 @@ export default function TaiKhoanPage() {
       <div className="page-head">
         <h1 className="page-title">Tài khoản</h1>
         <p className="page-desc">
-          Số đang dùng: <strong>{phone ?? "chưa có"}</strong>. Đổi số vẫn giữ
-          nguyên tài khoản: vai trò trong dòng họ, quyền Trưởng tộc và quyền
-          quản trị đều đi theo.
+          Số điện thoại: <strong>{phone ?? "chưa có"}</strong> · Email:{" "}
+          <strong>{email ?? "chưa có"}</strong>. Đổi số hay thêm email vẫn
+          giữ nguyên tài khoản: vai trò trong dòng họ, quyền Trưởng tộc và
+          quyền quản trị đều đi theo.
         </p>
       </div>
 
@@ -199,6 +213,17 @@ export default function TaiKhoanPage() {
           xác minh và đổi hộ.
         </p>
       </div>
+
+      {loggedIn && (
+        <MatKhauEmail
+          email={email}
+          hasPassword={hasPassword}
+          onSaved={(e) => {
+            setEmail(e);
+            setHasPassword(true);
+          }}
+        />
+      )}
     </>
   );
 }

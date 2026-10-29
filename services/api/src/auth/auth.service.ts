@@ -15,10 +15,17 @@ import { Prisma, UserStatus } from '@prisma/client';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import {
+  EmailLoginDto,
+  EmailRegisterDto,
+  GoogleLoginDto,
+  SetPasswordDto,
+} from './dto/email-auth.dto';
+import {
   ConfirmPhoneChangeDto,
   RequestPhoneChangeDto,
 } from './dto/phone-change.dto';
 import { jwtSecret } from './jwt-secret';
+import { normalizeVnPhone } from '../common/phone';
 
 /**
  * AuthService — triển khai đầy đủ xác thực OTP + phiên JWT.
@@ -39,6 +46,8 @@ const REFRESH_TTL_MS = 30 * 24 * 3600_000;
 const LOGIN_PURPOSES = ['register', 'login', 'recover'];
 const PHONE_CHANGE_OLD = 'phone_change_old';
 const PHONE_CHANGE_NEW = 'phone_change_new';
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MS = 15 * 60_000;
 
 @Injectable()
 export class AuthService {
@@ -133,7 +142,9 @@ export class AuthService {
     // CẢ 2 biến môi trường đều được đặt, và chỉ đúng 1 số điện thoại.
     // Xóa 1 trong 2 biến là đóng lại ngay, không cần sửa code.
     // Đặt trước bước tra mã thật để Ba không cần nhận SMS.
-    const testPhone = process.env.TEST_PHONE;
+    const testPhone = process.env.TEST_PHONE
+      ? normalizeVnPhone(process.env.TEST_PHONE)
+      : undefined;
     const testCode = process.env.TEST_OTP_CODE;
     if (
       testPhone &&
@@ -315,8 +326,23 @@ export class AuthService {
         code: 'UNAUTHENTICATED',
         message: 'Phiên không hợp lệ',
       });
-    const { passwordHash: _ph, ...safe } = user;
-    return { data: { user: safe }, error: null };
+    const {
+      passwordHash,
+      googleSub,
+      failedLoginCount: _f,
+      lockedUntil: _l,
+      ...safe
+    } = user;
+    return {
+      data: {
+        user: {
+          ...safe,
+          hasPassword: Boolean(passwordHash),
+          hasGoogle: Boolean(googleSub),
+        },
+      },
+      error: null,
+    };
   }
 
   /**
@@ -461,6 +487,335 @@ export class AuthService {
         message: 'Phiên không hợp lệ',
       });
     return user;
+  }
+
+  // ------------------------------------------------------------------
+  // EMAIL + MẬT KHẨU, GOOGLE — thêm lựa chọn đăng nhập khi chưa có SMS.
+  // Mọi cách đều gắn vào cùng bảng users, nên tài khoản có thể thêm số
+  // điện thoại sau (đổi số) mà vẫn giữ vai trò.
+  // ------------------------------------------------------------------
+
+  /** POST /auth/email/register — tạo tài khoản bằng email + mật khẩu. */
+  async registerEmail(dto: EmailRegisterDto) {
+    const email = dto.email.trim().toLowerCase();
+    const taken = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (taken) throw this.emailTaken();
+    const displayName = dto.displayName.trim();
+    let userId: string;
+    try {
+      userId = await this.prisma.$transaction(async (tx) => {
+        const u = await tx.user.create({
+          data: {
+            email,
+            passwordHash: await argon2.hash(dto.password),
+            displayName,
+          },
+        });
+        await tx.memberProfile.create({
+          data: { userId: u.id, fullName: displayName },
+        });
+        return u.id;
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      )
+        throw this.emailTaken();
+      throw e;
+    }
+    return this.issueSession(userId, dto.deviceName, dto.devicePlatform);
+  }
+
+  /**
+   * POST /auth/email/login. Sai mật khẩu 5 lần liên tiếp → khóa 15 phút
+   * (lưu ở DB vì API chạy serverless, bộ nhớ không giữ được giữa các lần
+   * gọi). Thông báo lỗi giống nhau cho "không có email" và "sai mật khẩu"
+   * để không lộ email nào đã đăng ký.
+   */
+  async loginEmail(dto: EmailLoginDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user?.lockedUntil && user.lockedUntil > new Date())
+      throw new HttpException(
+        {
+          code: 'LOGIN_LOCKED',
+          message:
+            'Nhập sai mật khẩu quá nhiều lần — vui lòng thử lại sau 15 phút',
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    const ok =
+      !!user?.passwordHash &&
+      (await argon2.verify(user.passwordHash, dto.password));
+    if (!user || !ok) {
+      if (user) {
+        const fails = user.failedLoginCount + 1;
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data:
+            fails >= LOGIN_MAX_FAILS
+              ? {
+                  failedLoginCount: 0,
+                  lockedUntil: new Date(Date.now() + LOGIN_LOCK_MS),
+                }
+              : { failedLoginCount: fails },
+        });
+      }
+      throw new UnauthorizedException({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Email hoặc mật khẩu không đúng',
+      });
+    }
+    if (user.status !== UserStatus.ACTIVE)
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'Tài khoản đã bị khóa hoặc xóa',
+      });
+    if (user.failedLoginCount || user.lockedUntil)
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginCount: 0, lockedUntil: null },
+      });
+    return this.issueSession(user.id, dto.deviceName, dto.devicePlatform);
+  }
+
+  /**
+   * POST /auth/password — thêm hoặc đổi email + mật khẩu cho tài khoản
+   * đang đăng nhập (vd: người dùng bằng số điện thoại muốn thêm cách
+   * đăng nhập dự phòng). Đã có mật khẩu thì phải nhập mật khẩu cũ.
+   */
+  async setPassword(
+    userId: string,
+    sessionId: string | undefined,
+    dto: SetPasswordDto,
+  ) {
+    const user = await this.activeUser(userId);
+    if (user.passwordHash) {
+      const ok =
+        !!dto.currentPassword &&
+        (await argon2.verify(user.passwordHash, dto.currentPassword));
+      if (!ok)
+        throw new UnauthorizedException({
+          code: 'INVALID_CREDENTIALS',
+          message: 'Mật khẩu hiện tại không đúng',
+        });
+    }
+    const email = dto.email?.trim().toLowerCase() ?? user.email;
+    if (!email)
+      throw new BadRequestException({
+        code: 'EMAIL_REQUIRED',
+        message: 'Cần nhập email để đăng nhập bằng mật khẩu',
+      });
+    const emailChanged = email !== user.email;
+    if (emailChanged) {
+      const taken = await this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (taken) throw this.emailTaken();
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          email,
+          passwordHash: await argon2.hash(dto.newPassword),
+          ...(emailChanged ? { emailVerifiedAt: null } : {}),
+          failedLoginCount: 0,
+          lockedUntil: null,
+        },
+      });
+      // Đổi mật khẩu → đăng xuất các thiết bị khác.
+      await tx.userSession.updateMany({
+        where: {
+          userId: user.id,
+          revokedAt: null,
+          ...(sessionId ? { id: { not: sessionId } } : {}),
+        },
+        data: { revokedAt: new Date() },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: 'auth.password.set',
+          targetType: 'user',
+          targetId: user.id,
+          metadata: { email, emailChanged },
+        },
+      });
+    });
+    return { data: { email }, error: null };
+  }
+
+  /**
+   * POST /auth/google — đổi ID token Google lấy phiên. Token được Google
+   * kiểm tra (tokeninfo) và phải đúng GOOGLE_CLIENT_ID của ứng dụng.
+   * Tìm theo google_sub; chưa có thì gắn vào tài khoản cùng email; chưa có
+   * nữa thì tạo tài khoản mới.
+   */
+  async loginGoogle(dto: GoogleLoginDto) {
+    const clientIds = (process.env.GOOGLE_CLIENT_ID ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!clientIds.length)
+      throw new HttpException(
+        {
+          code: 'GOOGLE_LOGIN_DISABLED',
+          message: 'Đăng nhập Google chưa được bật trên máy chủ',
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    const claims = await this.verifyGoogleToken(dto.idToken, clientIds);
+    const email = claims.email.toLowerCase();
+
+    let user = await this.prisma.user.findUnique({
+      where: { googleSub: claims.sub },
+    });
+    if (!user) {
+      const byEmail = await this.prisma.user.findUnique({ where: { email } });
+      if (byEmail) {
+        // Gắn Google vào tài khoản sẵn có. Nếu email đó chưa từng được xác
+        // minh (tự khai khi đăng ký mật khẩu), có thể là người khác đăng ký
+        // trước bằng email của chủ thật → bỏ mật khẩu cũ, đăng xuất mọi
+        // phiên, để chỉ chủ email (đã được Google xác minh) dùng được.
+        const unverified = !byEmail.emailVerifiedAt;
+        user = await this.prisma.$transaction(async (tx) => {
+          const u = await tx.user.update({
+            where: { id: byEmail.id },
+            data: {
+              googleSub: claims.sub,
+              emailVerifiedAt: new Date(),
+              ...(unverified ? { passwordHash: null } : {}),
+            },
+          });
+          if (unverified)
+            await tx.userSession.updateMany({
+              where: { userId: u.id, revokedAt: null },
+              data: { revokedAt: new Date() },
+            });
+          await tx.auditLog.create({
+            data: {
+              actorId: u.id,
+              action: 'auth.google.linked',
+              targetType: 'user',
+              targetId: u.id,
+              metadata: { email, resetPassword: unverified },
+            },
+          });
+          return u;
+        });
+      } else {
+        const displayName = (claims.name ?? email.split('@')[0]).slice(0, 100);
+        user = await this.prisma.$transaction(async (tx) => {
+          const u = await tx.user.create({
+            data: {
+              email,
+              emailVerifiedAt: new Date(),
+              googleSub: claims.sub,
+              displayName,
+              avatarUrl: claims.picture ?? null,
+            },
+          });
+          await tx.memberProfile.create({
+            data: { userId: u.id, fullName: displayName },
+          });
+          return u;
+        });
+      }
+    }
+    if (user.status !== UserStatus.ACTIVE)
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'Tài khoản đã bị khóa hoặc xóa',
+      });
+    return this.issueSession(user.id, dto.deviceName, dto.devicePlatform);
+  }
+
+  private async verifyGoogleToken(
+    idToken: string,
+    clientIds: string[],
+  ): Promise<{ sub: string; email: string; name?: string; picture?: string }> {
+    const invalid = new UnauthorizedException({
+      code: 'GOOGLE_TOKEN_INVALID',
+      message: 'Không xác thực được tài khoản Google — vui lòng thử lại',
+    });
+    let claims: Record<string, string | undefined>;
+    try {
+      const res = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      );
+      if (!res.ok) throw invalid;
+      claims = (await res.json()) as Record<string, string | undefined>;
+    } catch {
+      throw invalid;
+    }
+    const issuerOk =
+      claims.iss === 'accounts.google.com' ||
+      claims.iss === 'https://accounts.google.com';
+    if (
+      !issuerOk ||
+      !claims.aud ||
+      !clientIds.includes(claims.aud) ||
+      !claims.sub ||
+      !claims.email ||
+      claims.email_verified !== 'true'
+    )
+      throw invalid;
+    return {
+      sub: claims.sub,
+      email: claims.email,
+      name: claims.name,
+      picture: claims.picture,
+    };
+  }
+
+  private emailTaken() {
+    return new ConflictException({
+      code: 'EMAIL_TAKEN',
+      message:
+        'Email này đã có tài khoản. Hãy đăng nhập, hoặc dùng Google nếu email là Gmail.',
+    });
+  }
+
+  /**
+   * Quản trị nền tảng đặt lại mật khẩu hộ (chưa có dịch vụ gửi email).
+   * Trả mật khẩu tạm đúng 1 lần để người vận hành chuyển cho người dùng.
+   */
+  async resetPasswordByAdmin(
+    actorId: string,
+    targetId: string,
+    reason: string,
+  ): Promise<string> {
+    const temp = randomBytes(6).toString('base64url');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: targetId },
+        data: {
+          passwordHash: await argon2.hash(temp),
+          failedLoginCount: 0,
+          lockedUntil: null,
+        },
+      });
+      await tx.userSession.updateMany({
+        where: { userId: targetId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: 'admin.user.password_reset',
+          targetType: 'user',
+          targetId,
+          metadata: { reason },
+        },
+      });
+    });
+    return temp;
   }
 
   // ------------------------------------------------------------------

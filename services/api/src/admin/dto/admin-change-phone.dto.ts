@@ -1,6 +1,8 @@
 import { IsNotEmpty, IsPhoneNumber, IsString, MaxLength } from 'class-validator';
+import { NormalizePhone } from '../../common/phone';
 
 export class AdminChangePhoneDto {
+  @NormalizePhone()
   @IsPhoneNumber('VN')
   phone: string;
 
