@@ -4,7 +4,7 @@ const nextConfig = {
   // để không gãy link đã gửi; các trang dữ liệu mẫu cũ đã bỏ.
   async redirects() {
     return [
-      { source: "/", destination: "/quan-ly", permanent: false },
+      { source: "/", destination: "/app", permanent: false },
       { source: "/duyet-xac-minh", destination: "/quan-ly", permanent: false },
       {
         source: "/admin/:lineageId/duyet-xac-minh",

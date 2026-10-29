@@ -15,8 +15,9 @@ Dự án dùng 2 Vercel project riêng (monorepo):
     `scripts/db-sync.sh`:
     - Build **preview** (PR): bỏ qua database — không để nhánh chưa merge đổi
       schema production.
-    - Build **production**: chạy `prisma/sql/2026-10-28-gop-vai-tro.sql`
-      (chuyển 7 vai trò cũ về 3, idempotent) rồi `prisma db push`.
+    - Build **production**: chạy lần lượt mọi file `prisma/sql/*.sql` (đều
+      idempotent: gộp vai trò, cột đăng nhập email/Google, dòng họ mẫu cho
+      trang `/mau`) rồi `prisma db push`.
       **Không dùng `--accept-data-loss`**: thay đổi có thể làm mất dữ liệu sẽ
       dừng build thay vì xóa dữ liệu. Bước tiếp theo: `prisma migrate deploy`.
   - `rewrites`: `/api/v1/*` → `/api` (giữ nguyên prefix `api/v1` của app).
