@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { get } from "@/lib/api";
 import { MyLineage, canManageLineage, roleLabel } from "@/lib/roles";
+import BatDau from "@/components/BatDau";
 
 export default function QuanLyPage() {
   const router = useRouter();
@@ -57,10 +58,13 @@ export default function QuanLyPage() {
       {state === "error" && <p className="muted-text">Không tải được: {error}</p>}
       {state === "ready" &&
         (list.length === 0 ? (
-          <p className="muted-text">
-            Bạn chưa có vai trò quản lý ở dòng họ nào.{" "}
-            <Link href="/app">Vào không gian con cháu</Link>
-          </p>
+          <>
+            <p className="muted-text">
+              Bạn chưa có vai trò quản lý ở dòng họ nào.{" "}
+              <Link href="/app">Vào không gian con cháu</Link>
+            </p>
+            <BatDau onJoined={() => router.push("/app")} />
+          </>
         ) : (
           <div className="table-wrap">
             <table>

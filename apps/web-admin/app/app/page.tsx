@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
 import { MyLineage, canManageLineage, roleLabel } from "@/lib/roles";
+import BatDau from "@/components/BatDau";
 
 type Lineage = MyLineage;
 
@@ -89,8 +90,13 @@ export default function AppHomePage() {
     }
   }, []);
 
+  // Mã mời từ link /app?ma=XXXX (đọc trực tiếp để khỏi cần Suspense).
+  const [inviteCode, setInviteCode] = useState("");
   useEffect(() => {
-    (async () => {
+    setInviteCode(new URLSearchParams(window.location.search).get("ma") ?? "");
+  }, []);
+
+  const loadLineages = useCallback(async () => {
       try {
         const body = await get<{ data?: { lineages?: Lineage[] } }>("/lineages");
         const list = body?.data?.lineages ?? [];
@@ -105,8 +111,11 @@ export default function AppHomePage() {
         );
         setLoading(false);
       }
-    })();
   }, []);
+
+  useEffect(() => {
+    void loadLineages();
+  }, [loadLineages]);
 
   useEffect(() => {
     if (lineageId) void loadTree(lineageId);
@@ -157,9 +166,34 @@ export default function AppHomePage() {
             không gian con cháu, cổng Trưởng tộc và cổng nền tảng.
           </p>
         </div>
-        <Link className="btn primary" href="/dang-nhap">
+        <Link
+          className="btn primary"
+          href={inviteCode ? `/dang-nhap?ma=${encodeURIComponent(inviteCode)}` : "/dang-nhap"}
+        >
           Đăng nhập
         </Link>
+      </>
+    );
+  }
+
+  const onJoined = () => {
+    setInviteCode("");
+    window.history.replaceState(null, "", "/app");
+    void loadLineages();
+  };
+
+  // Người mới chưa thuộc họ nào: chỉ hiện bước bắt đầu, ẩn cây/giỗ/vai vế trống.
+  if (!loading && !error && lineages.length === 0) {
+    return (
+      <>
+        <div className="page-head">
+          <h1 className="page-title">Bắt đầu</h1>
+          <p className="page-desc">
+            Bạn chưa thuộc dòng họ nào. Nhập mã mời người trong họ gửi cho
+            bạn, hoặc tự tạo dòng họ của mình.
+          </p>
+        </div>
+        <BatDau key={inviteCode} initialCode={inviteCode} onJoined={onJoined} />
       </>
     );
   }
@@ -191,6 +225,10 @@ export default function AppHomePage() {
           tài khoản, cùng một lần đăng nhập với cổng Trưởng tộc.
         </p>
       </div>
+
+      {!loading && !error && inviteCode && (
+        <BatDau key={inviteCode} initialCode={inviteCode} onJoined={onJoined} />
+      )}
 
       {error && error !== "unauthorized" && (
         <div className="card section-gap">

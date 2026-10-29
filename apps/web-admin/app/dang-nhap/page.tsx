@@ -69,6 +69,12 @@ export default function DangNhapPage() {
     const access = body?.data?.accessToken;
     if (!access) throw new Error("Máy chủ không trả về token.");
     saveTokens(access, body.data?.refreshToken);
+    // Đến từ link mời /app?ma=XXXX → quay lại đó để vào họ.
+    const ma = new URLSearchParams(window.location.search).get("ma");
+    if (ma) {
+      router.push(`/app?ma=${encodeURIComponent(ma)}`);
+      return;
+    }
     // Có vai trò quản lý ở ít nhất 1 họ → cổng quản lý; còn lại → con cháu.
     const mine = await get<{ data?: { lineages?: MyLineage[] } }>(
       "/lineages?limit=100",
