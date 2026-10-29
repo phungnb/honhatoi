@@ -315,6 +315,84 @@ export class AuthService {
     return { data: { loggedOut: true }, error: null };
   }
 
+  /**
+   * DELETE /auth/me — người dùng tự xóa tài khoản (App Store / Google Play bắt
+   * buộc có). Xóa thông tin đăng nhập và thông tin cá nhân, thu hồi mọi phiên,
+   * rời mọi dòng họ. Người trong cây gia phả (FamilyPerson) do dòng họ quản lý
+   * nên giữ nguyên, chỉ gỡ liên kết tài khoản. Tin nhắn đã gửi giữ nội dung
+   * nhưng tên người gửi thành "Người dùng đã xóa".
+   *
+   * Đang là Trưởng tộc của dòng họ còn thành viên khác thì phải chuyển quyền
+   * trước; dòng họ chỉ có một mình thì xóa luôn dòng họ.
+   */
+  async deleteMe(userId: string) {
+    const owned = await this.prisma.lineage.findMany({
+      where: { ownerUserId: userId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            memberships: { where: { status: 'approved', userId: { not: userId } } },
+          },
+        },
+      },
+    });
+    const blocking = owned.filter((l) => l._count.memberships > 0);
+    if (blocking.length)
+      throw new ConflictException({
+        code: 'OWNS_LINEAGE',
+        message: `Bạn đang là Trưởng tộc của ${blocking
+          .map((l) => l.name)
+          .join(', ')}. Hãy chuyển quyền Trưởng tộc cho người khác trước khi xóa tài khoản.`,
+      });
+
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.lineage.updateMany({
+        where: { id: { in: owned.map((l) => l.id) } },
+        data: { deletedAt: now },
+      }),
+      this.prisma.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+      this.prisma.pushDevice.deleteMany({ where: { userId } }),
+      this.prisma.memberProfile.deleteMany({ where: { userId } }),
+      this.prisma.personAccountLink.deleteMany({ where: { userId } }),
+      this.prisma.lineageMembership.updateMany({
+        where: { userId, status: { in: ['approved', 'pending'] } },
+        data: { status: 'left' },
+      }),
+      this.prisma.conversationMember.updateMany({
+        where: { userId, leftAt: null },
+        data: { leftAt: now },
+      }),
+      this.prisma.message.updateMany({
+        where: { senderId: userId },
+        data: { senderNameSnapshot: 'Người dùng đã xóa' },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          status: UserStatus.DELETED,
+          deletedAt: now,
+          displayName: 'Người dùng đã xóa',
+          avatarUrl: null,
+          phone: null,
+          email: null,
+          emailVerifiedAt: null,
+          googleSub: null,
+          passwordHash: null,
+        },
+      }),
+      this.prisma.dataDeletionRequest.create({
+        data: { userId, requestType: 'account', status: 'completed', completedAt: now },
+      }),
+    ]);
+    return { data: { deleted: true }, error: null };
+  }
+
   /** GET /auth/me — hồ sơ rút gọn của user hiện tại. */
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({

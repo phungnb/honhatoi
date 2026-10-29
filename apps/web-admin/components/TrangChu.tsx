@@ -13,6 +13,7 @@ import { useLineages } from "@/lib/lineage";
 import { canManageLineage, isLineageAdmin, roleLabel } from "@/lib/roles";
 import BatDau from "@/components/BatDau";
 import GioSapToi from "@/components/GioSapToi";
+import GioiThieu from "@/components/GioiThieu";
 
 interface EventItem {
   id: string;
@@ -89,29 +90,7 @@ export default function TrangChu() {
     void reload();
   };
 
-  if (error === "unauthorized")
-    return (
-      <>
-        <div className="page-head">
-          <h1 className="page-title">Họ Nhà Tôi</h1>
-          <p className="page-desc">
-            Gia phả số của dòng họ: cây gia phả theo đời, ngày giỗ tính theo
-            âm lịch, tra vai vế xưng hô, mời con cháu qua Zalo.
-          </p>
-        </div>
-        <div className="btn-row">
-          <Link
-            className="btn primary"
-            href={inviteCode ? `/dang-nhap?ma=${encodeURIComponent(inviteCode)}` : "/dang-nhap"}
-          >
-            Đăng nhập
-          </Link>
-          <Link className="btn" href="/mau">
-            Xem dòng họ mẫu
-          </Link>
-        </div>
-      </>
-    );
+  if (error === "unauthorized") return <GioiThieu inviteCode={inviteCode} />;
 
   if (loading) return <p className="muted-text">Đang tải…</p>;
 

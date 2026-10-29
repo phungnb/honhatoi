@@ -13,6 +13,7 @@ import Link from "next/link";
 import { clearTokens, get, getAccessToken, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 import MatKhauEmail from "@/components/MatKhauEmail";
+import XoaTaiKhoan from "@/components/XoaTaiKhoan";
 
 const inputStyle: CSSProperties = {
   display: "block",
@@ -246,6 +247,11 @@ export default function TaiKhoanPage() {
           Đăng xuất
         </button>
       </div>
+      {loggedIn && <XoaTaiKhoan />}
+      <p className="muted-text section-gap">
+        <Link href="/dieu-khoan">Điều khoản sử dụng</Link> ·{" "}
+        <Link href="/quyen-rieng-tu">Chính sách quyền riêng tư</Link>
+      </p>
     </>
   );
 }
