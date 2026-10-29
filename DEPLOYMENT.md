@@ -21,6 +21,9 @@ Dự án dùng 2 Vercel project riêng (monorepo):
       dừng build thay vì xóa dữ liệu. Bước tiếp theo: `prisma migrate deploy`.
   - `rewrites`: `/api/v1/*` → `/api` (giữ nguyên prefix `api/v1` của app).
 - Biến môi trường (đã cài trên Vercel): `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`.
+- CORS: API tự cho phép `https://honhatoi-web-admin.vercel.app` và các bản
+  preview `honhatoi-web-admin-*-racehub1.vercel.app`; `CORS_ORIGINS` (dấu
+  phẩy) thêm tên miền khác.
 - Tùy chọn: `GOOGLE_CLIENT_ID` (OAuth Client ID loại Web của Google; nhiều ID
   cách nhau bằng dấu phẩy) để bật đăng nhập Google. Không đặt thì
   `/auth/google` trả 503.
