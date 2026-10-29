@@ -38,5 +38,10 @@ Không deploy lên Vercel (app di động). Build APK/IPA riêng để phân ph�
   `ADMIN` (Ban quản trị). Trưởng tộc = `lineages.owner_user_id`.
 - Quản trị nền tảng (`/super-admin`): bật bằng SQL, không có API cấp quyền:
   `UPDATE users SET is_platform_admin = true WHERE phone = '<số ĐT>';`
+- Đổi số điện thoại giữ nguyên tài khoản (mọi quyền đi theo):
+  - Tự đổi: web `/tai-khoan` hoặc app tab Cá nhân. Cần mã OTP của cả số cũ
+    lẫn số mới; đổi xong các thiết bị khác bị đăng xuất.
+  - Mất số cũ: quản trị nền tảng xác minh danh tính rồi đổi hộ trong
+    `/super-admin` (ghi lý do vào audit log).
 - Web: một cổng `/quan-ly`; đường dẫn cũ (`/duyet-xac-minh`,
   `/admin/<họ>/duyet-xac-minh`, `/dong-ho`…) tự chuyển hướng.

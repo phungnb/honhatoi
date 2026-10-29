@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ho_nha_toi/core/auth_state.dart';
 import 'package:ho_nha_toi/core/repositories/lineage_repository.dart';
 import 'package:ho_nha_toi/core/widgets/async_view.dart';
+import 'package:ho_nha_toi/features/profile/change_phone_screen.dart';
 import 'package:ho_nha_toi/theme/app_theme.dart';
 import 'package:ho_nha_toi/theme/theme_mode_provider.dart';
 
@@ -93,6 +94,32 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           _sectionTitle(p, 'TÀI KHOẢN'),
+          const SizedBox(height: 8),
+          Container(
+            decoration: AppTheme.cardDecoration(p),
+            child: ListTile(
+              leading: Icon(Icons.phone_iphone, color: p.text),
+              title: Text(
+                'Đổi số điện thoại',
+                style:
+                    TextStyle(color: p.text, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                'Giữ nguyên tài khoản và vai trò',
+                style: TextStyle(color: p.secondary, fontSize: 13),
+              ),
+              trailing: Icon(Icons.chevron_right, color: p.secondary),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ChangePhoneScreen(
+                    currentPhone:
+                        ref.read(authMeProvider).valueOrNull?['phone']
+                            as String?,
+                  ),
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
           Container(
             decoration: AppTheme.cardDecoration(p),

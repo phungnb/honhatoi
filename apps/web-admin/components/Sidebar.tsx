@@ -24,7 +24,9 @@ export default function Sidebar() {
     { href: "/quan-ly", label: "Quản lý dòng họ" },
     { href: "/app", label: "Không gian con cháu" },
     ...(platformAdmin ? [{ href: "/super-admin", label: "Quản trị nền tảng" }] : []),
-    ...(loggedIn ? [] : [{ href: "/dang-nhap", label: "Đăng nhập" }]),
+    ...(loggedIn
+      ? [{ href: "/tai-khoan", label: "Tài khoản" }]
+      : [{ href: "/dang-nhap", label: "Đăng nhập" }]),
   ];
 
   // Hai luồng khác (con cháu, nền tảng) có không gian riêng, không dùng

@@ -1,8 +1,20 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import {
+  ConfirmPhoneChangeDto,
+  RequestPhoneChangeDto,
+} from './dto/phone-change.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
 
@@ -41,5 +53,26 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUserId() userId: string) {
     return this.auth.me(userId);
+  }
+
+  @Post('phone/change/request')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  requestPhoneChange(
+    @CurrentUserId() userId: string,
+    @Body() dto: RequestPhoneChangeDto,
+  ) {
+    return this.auth.requestPhoneChange(userId, dto);
+  }
+
+  @Post('phone/change/confirm')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  confirmPhoneChange(
+    @CurrentUserId() userId: string,
+    @Req() req: { user?: { sessionId?: string } },
+    @Body() dto: ConfirmPhoneChangeDto,
+  ) {
+    return this.auth.confirmPhoneChange(userId, req.user?.sessionId, dto);
   }
 }
