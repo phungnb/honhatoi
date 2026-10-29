@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
+import DoiSoHo from "@/components/DoiSoHo";
 
 interface AdminLineage {
   id: string;
@@ -130,6 +131,8 @@ export default function SuperAdminPage() {
           </div>
         )
       )}
+
+      {!loading && !error && <DoiSoHo />}
     </>
   );
 }

@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -9,9 +11,13 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { createHash, randomBytes, randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserStatus } from '@prisma/client';
+import { Prisma, UserStatus } from '@prisma/client';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import {
+  ConfirmPhoneChangeDto,
+  RequestPhoneChangeDto,
+} from './dto/phone-change.dto';
 import { jwtSecret } from './jwt-secret';
 
 /**
@@ -29,6 +35,10 @@ const OTP_MAX_PER_WINDOW = 5;
 const ACCESS_TTL = '15m';
 const ACCESS_TTL_SEC = 15 * 60;
 const REFRESH_TTL_MS = 30 * 24 * 3600_000;
+/** Mã OTP đăng nhập — tách khỏi mã đổi số để không dùng lẫn được. */
+const LOGIN_PURPOSES = ['register', 'login', 'recover'];
+const PHONE_CHANGE_OLD = 'phone_change_old';
+const PHONE_CHANGE_NEW = 'phone_change_new';
 
 @Injectable()
 export class AuthService {
@@ -42,9 +52,15 @@ export class AuthService {
 
   /** POST /auth/otp/request — sinh OTP, lưu hash. SMS do provider gửi (TODO). */
   async requestOtp(dto: RequestOtpDto) {
+    await this.issueOtp(dto.phone, dto.purpose);
+    return { data: { sent: true }, error: null };
+  }
+
+  /** Rate limit theo số ĐT, sinh mã 6 số, chỉ lưu hash. */
+  private async issueOtp(phone: string, purpose: string): Promise<void> {
     const since = new Date(Date.now() - OTP_WINDOW_MS);
     const recent = await this.prisma.phoneOtpCode.count({
-      where: { phone: dto.phone, createdAt: { gte: since } },
+      where: { phone, createdAt: { gte: since } },
     });
     if (recent >= OTP_MAX_PER_WINDOW)
       throw new HttpException(
@@ -58,14 +74,57 @@ export class AuthService {
     const code = String(randomInt(100_000, 1_000_000));
     await this.prisma.phoneOtpCode.create({
       data: {
-        phone: dto.phone,
+        phone,
         codeHash: await argon2.hash(code),
-        purpose: dto.purpose,
+        purpose,
         expiresAt: new Date(Date.now() + OTP_TTL_MS),
       },
     });
     // TODO: gửi SMS qua nhà cung cấp (Viettel/VMG/...). KHÔNG bao giờ trả mã về response.
-    return { data: { sent: true }, error: null };
+  }
+
+  /**
+   * Kiểm tra mã OTP mới nhất còn hạn của số ĐT (đúng mục đích). Sai thì
+   * tăng số lần nhập sai và ném lỗi; đúng thì trả id bản ghi — người gọi
+   * tự đánh dấu đã dùng (để đổi số chỉ tiêu mã khi CẢ HAI mã đều đúng).
+   */
+  private async checkOtp(
+    phone: string,
+    code: string,
+    purposes: string[],
+  ): Promise<string> {
+    const record = await this.prisma.phoneOtpCode.findFirst({
+      where: {
+        phone,
+        purpose: { in: purposes },
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!record)
+      throw new UnauthorizedException({
+        code: 'OTP_INVALID_OR_EXPIRED',
+        message: 'Mã OTP không đúng hoặc đã hết hạn',
+      });
+    if (record.attempts >= OTP_MAX_ATTEMPTS)
+      throw new UnauthorizedException({
+        code: 'OTP_LOCKED',
+        message: 'Nhập sai quá 5 lần — hãy yêu cầu mã mới',
+      });
+
+    const ok = await argon2.verify(record.codeHash, code);
+    if (!ok) {
+      await this.prisma.phoneOtpCode.update({
+        where: { id: record.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException({
+        code: 'OTP_INVALID',
+        message: 'Mã OTP không đúng',
+      });
+    }
+    return record.id;
   }
 
   /** POST /auth/otp/verify — đổi OTP lấy cặp access + refresh token. */
@@ -89,38 +148,9 @@ export class AuthService {
       );
     }
 
-    const record = await this.prisma.phoneOtpCode.findFirst({
-      where: {
-        phone: dto.phone,
-        consumedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!record)
-      throw new UnauthorizedException({
-        code: 'OTP_INVALID_OR_EXPIRED',
-        message: 'Mã OTP không đúng hoặc đã hết hạn',
-      });
-    if (record.attempts >= OTP_MAX_ATTEMPTS)
-      throw new UnauthorizedException({
-        code: 'OTP_LOCKED',
-        message: 'Nhập sai quá 5 lần — hãy yêu cầu mã mới',
-      });
-
-    const ok = await argon2.verify(record.codeHash, dto.code);
-    if (!ok) {
-      await this.prisma.phoneOtpCode.update({
-        where: { id: record.id },
-        data: { attempts: { increment: 1 } },
-      });
-      throw new UnauthorizedException({
-        code: 'OTP_INVALID',
-        message: 'Mã OTP không đúng',
-      });
-    }
+    const otpId = await this.checkOtp(dto.phone, dto.code, LOGIN_PURPOSES);
     await this.prisma.phoneOtpCode.update({
-      where: { id: record.id },
+      where: { id: otpId },
       data: { consumedAt: new Date() },
     });
 
@@ -287,6 +317,150 @@ export class AuthService {
       });
     const { passwordHash: _ph, ...safe } = user;
     return { data: { user: safe }, error: null };
+  }
+
+  /**
+   * POST /auth/phone/change/request — gửi mã tới CẢ số cũ lẫn số mới.
+   * Đổi số giữ nguyên tài khoản (user id), nên vai trò Trưởng tộc, quyền
+   * quản trị nền tảng, dòng họ đã tham gia đều đi theo.
+   */
+  async requestPhoneChange(userId: string, dto: RequestPhoneChangeDto) {
+    const user = await this.activeUser(userId);
+    if (user.phone === dto.newPhone)
+      throw new BadRequestException({
+        code: 'SAME_PHONE',
+        message: 'Số mới trùng với số đang dùng',
+      });
+    await this.assertPhoneFree(dto.newPhone);
+
+    if (user.phone) await this.issueOtp(user.phone, PHONE_CHANGE_OLD);
+    await this.issueOtp(dto.newPhone, PHONE_CHANGE_NEW);
+    return {
+      data: { sent: true, requiresOldCode: Boolean(user.phone) },
+      error: null,
+    };
+  }
+
+  /**
+   * POST /auth/phone/change/confirm — cần mã của số cũ (chứng minh vẫn giữ
+   * số cũ, chống người cầm máy đang đăng nhập chiếm tài khoản) và mã của
+   * số mới. Đổi xong thu hồi mọi phiên khác, giữ phiên hiện tại.
+   * Mất số cũ → nhờ quản trị nền tảng đổi hộ (POST /admin/users/:id/phone).
+   */
+  async confirmPhoneChange(
+    userId: string,
+    sessionId: string | undefined,
+    dto: ConfirmPhoneChangeDto,
+  ) {
+    const user = await this.activeUser(userId);
+    if (user.phone && !dto.oldCode)
+      throw new BadRequestException({
+        code: 'OLD_CODE_REQUIRED',
+        message: 'Cần nhập mã gửi tới số điện thoại cũ',
+      });
+
+    const otpIds: string[] = [];
+    if (user.phone)
+      otpIds.push(
+        await this.checkOtp(user.phone, dto.oldCode!, [PHONE_CHANGE_OLD]),
+      );
+    otpIds.push(
+      await this.checkOtp(dto.newPhone, dto.newCode, [PHONE_CHANGE_NEW]),
+    );
+
+    await this.changePhone(user.id, user.phone, dto.newPhone, {
+      actorId: user.id,
+      keepSessionId: sessionId,
+      otpIds,
+    });
+    return { data: { phone: dto.newPhone }, error: null };
+  }
+
+  /**
+   * Đổi số trong 1 transaction: cập nhật số, tiêu mã OTP, thu hồi phiên,
+   * ghi audit. Dùng chung cho tự đổi và quản trị nền tảng đổi hộ.
+   */
+  async changePhone(
+    userId: string,
+    oldPhone: string | null,
+    newPhone: string,
+    opts: {
+      actorId: string;
+      keepSessionId?: string;
+      otpIds?: string[];
+      reason?: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: { phone: newPhone },
+        });
+        if (opts.otpIds?.length)
+          await tx.phoneOtpCode.updateMany({
+            where: { id: { in: opts.otpIds } },
+            data: { consumedAt: new Date() },
+          });
+        await tx.userSession.updateMany({
+          where: {
+            userId,
+            revokedAt: null,
+            ...(opts.keepSessionId ? { id: { not: opts.keepSessionId } } : {}),
+          },
+          data: { revokedAt: new Date() },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorId: opts.actorId,
+            action:
+              opts.actorId === userId
+                ? 'auth.phone.changed'
+                : 'admin.user.phone_changed',
+            targetType: 'user',
+            targetId: userId,
+            metadata: {
+              oldPhone,
+              newPhone,
+              ...(opts.reason ? { reason: opts.reason } : {}),
+            },
+          },
+        });
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      )
+        throw this.phoneTaken();
+      throw e;
+    }
+  }
+
+  async assertPhoneFree(phone: string): Promise<void> {
+    const taken = await this.prisma.user.findUnique({
+      where: { phone },
+      select: { id: true },
+    });
+    if (taken) throw this.phoneTaken();
+  }
+
+  private phoneTaken() {
+    return new ConflictException({
+      code: 'PHONE_TAKEN',
+      message:
+        'Số này đã gắn với một tài khoản khác. Liên hệ quản trị nền tảng nếu cần gộp tài khoản.',
+    });
+  }
+
+  private async activeUser(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.status !== UserStatus.ACTIVE)
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Phiên không hợp lệ',
+      });
+    return user;
   }
 
   // ------------------------------------------------------------------
