@@ -20,6 +20,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+
+  /// Đăng nhập bằng email + mật khẩu thay cho OTP (khi chưa nhận được SMS).
+  bool _emailMode = false;
+  bool _registering = false;
 
   bool _otpStep = false;
   bool _loading = false;
@@ -32,6 +39,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _phoneCtrl.dispose();
     _otpCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _nameCtrl.dispose();
     _cooldownTimer?.cancel();
     super.dispose();
   }
@@ -115,6 +125,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _submitEmail() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    if (!email.contains('@') || password.isEmpty) {
+      setState(() => _error = 'Vui lòng nhập email và mật khẩu.');
+      return;
+    }
+    if (_registering && password.length < 8) {
+      setState(() => _error = 'Mật khẩu cần ít nhất 8 ký tự.');
+      return;
+    }
+    if (_registering && _nameCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Vui lòng nhập họ tên.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final auth = ref.read(authStateProvider.notifier);
+      if (_registering) {
+        await auth.registerEmail(email, password, _nameCtrl.text);
+      } else {
+        await auth.loginEmail(email, password);
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -158,14 +209,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _otpStep
-                      ? 'Nhập mã 6 số đã gửi về điện thoại của bạn'
-                      : 'Đăng nhập bằng số điện thoại để bắt đầu',
+                  _emailMode
+                      ? (_registering
+                          ? 'Tạo tài khoản bằng email'
+                          : 'Đăng nhập bằng email và mật khẩu')
+                      : _otpStep
+                          ? 'Nhập mã 6 số đã gửi về điện thoại của bạn'
+                          : 'Đăng nhập bằng số điện thoại để bắt đầu',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: p.secondary, fontSize: 14),
                 ),
                 const SizedBox(height: 28),
-                if (!_otpStep) ...[
+                if (_emailMode) ...[
+                  if (_registering) ...[
+                    TextField(
+                      controller: _nameCtrl,
+                      enabled: !_loading,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        hintText: 'Họ và tên',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    enabled: !_loading,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      hintText: 'Email',
+                      prefixIcon: Icon(Icons.mail_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _passwordCtrl,
+                    obscureText: true,
+                    enabled: !_loading,
+                    decoration: InputDecoration(
+                      hintText: _registering
+                          ? 'Mật khẩu (ít nhất 8 ký tự)'
+                          : 'Mật khẩu',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                    ),
+                    onSubmitted: (_) => _submitEmail(),
+                  ),
+                  TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () => setState(() {
+                              _registering = !_registering;
+                              _error = null;
+                            }),
+                    child: Text(_registering
+                        ? 'Đã có tài khoản? Đăng nhập'
+                        : 'Chưa có tài khoản? Tạo mới'),
+                  ),
+                ] else if (!_otpStep) ...[
                   TextField(
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
@@ -244,7 +346,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _loading
                         ? null
-                        : (_otpStep ? _verifyOtp : _sendOtp),
+                        : (_emailMode
+                            ? _submitEmail
+                            : (_otpStep ? _verifyOtp : _sendOtp)),
                     child: _loading
                         ? SizedBox(
                             width: 20,
@@ -254,8 +358,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               color: p.onBrand,
                             ),
                           )
-                        : Text(_otpStep ? 'Xác nhận' : 'Gửi mã OTP'),
+                        : Text(_emailMode
+                            ? (_registering ? 'Tạo tài khoản' : 'Đăng nhập')
+                            : (_otpStep ? 'Xác nhận' : 'Gửi mã OTP')),
                   ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _loading
+                      ? null
+                      : () => setState(() {
+                            _emailMode = !_emailMode;
+                            _otpStep = false;
+                            _error = null;
+                          }),
+                  child: Text(_emailMode
+                      ? 'Đăng nhập bằng số điện thoại'
+                      : 'Đăng nhập bằng email'),
                 ),
                 const SizedBox(height: 16),
                 Text(

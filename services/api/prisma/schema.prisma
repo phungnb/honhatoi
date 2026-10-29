@@ -87,6 +87,14 @@ model User {
   /// Quản trị nền tảng (người vận hành). Chỉ bật bằng SQL — không có API
   /// nào cấp quyền này.
   isPlatformAdmin Boolean @default(false) @map("is_platform_admin")
+  /// Email đã được xác minh (hiện chỉ qua Google). Email tự khai khi đăng
+  /// ký bằng mật khẩu để null.
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  /// Định danh tài khoản Google (claim `sub`), dùng cho đăng nhập Google.
+  googleSub       String?   @unique @map("google_sub") @db.VarChar(64)
+  /// Chống dò mật khẩu: sai 5 lần liên tiếp thì khóa 15 phút.
+  failedLoginCount Int      @default(0) @map("failed_login_count")
+  lockedUntil     DateTime? @map("locked_until") @db.Timestamptz(6)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(6)

@@ -58,6 +58,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
       '/auth/otp/verify',
       body: {'phone': normalizeVnPhone(phone), 'code': code.trim()},
     );
+    await _saveSession(data);
+  }
+
+  /// Đăng nhập bằng email + mật khẩu.
+  Future<void> loginEmail(String email, String password) async {
+    final data = await ApiClient.instance.getData(
+      'POST',
+      '/auth/email/login',
+      body: {'email': email.trim(), 'password': password},
+    );
+    await _saveSession(data);
+  }
+
+  /// Tạo tài khoản bằng email + mật khẩu rồi đăng nhập luôn.
+  Future<void> registerEmail(
+    String email,
+    String password,
+    String displayName,
+  ) async {
+    final data = await ApiClient.instance.getData(
+      'POST',
+      '/auth/email/register',
+      body: {
+        'email': email.trim(),
+        'password': password,
+        'displayName': displayName.trim(),
+      },
+    );
+    await _saveSession(data);
+  }
+
+  Future<void> _saveSession(Map<String, dynamic> data) async {
     final accessToken = data['accessToken'] as String;
     final refreshToken = data['refreshToken'] as String;
     final user = data['user'] as Map<String, dynamic>?;

@@ -12,6 +12,12 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import {
+  EmailLoginDto,
+  EmailRegisterDto,
+  GoogleLoginDto,
+  SetPasswordDto,
+} from './dto/email-auth.dto';
+import {
   ConfirmPhoneChangeDto,
   RequestPhoneChangeDto,
 } from './dto/phone-change.dto';
@@ -74,5 +80,34 @@ export class AuthController {
     @Body() dto: ConfirmPhoneChangeDto,
   ) {
     return this.auth.confirmPhoneChange(userId, req.user?.sessionId, dto);
+  }
+
+  @Post('email/register')
+  @HttpCode(200)
+  registerEmail(@Body() dto: EmailRegisterDto) {
+    return this.auth.registerEmail(dto);
+  }
+
+  @Post('email/login')
+  @HttpCode(200)
+  loginEmail(@Body() dto: EmailLoginDto) {
+    return this.auth.loginEmail(dto);
+  }
+
+  @Post('google')
+  @HttpCode(200)
+  loginGoogle(@Body() dto: GoogleLoginDto) {
+    return this.auth.loginGoogle(dto);
+  }
+
+  @Post('password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  setPassword(
+    @CurrentUserId() userId: string,
+    @Req() req: { user?: { sessionId?: string } },
+    @Body() dto: SetPasswordDto,
+  ) {
+    return this.auth.setPassword(userId, req.user?.sessionId, dto);
   }
 }

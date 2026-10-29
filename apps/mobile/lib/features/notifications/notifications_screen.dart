@@ -89,7 +89,7 @@ class NotificationsScreen extends ConsumerWidget {
                               color: p.brand,
                               shape: BoxShape.circle,
                               border:
-                                  BorderSide(color: p.bg, width: 2),
+                                  Border.all(color: p.bg, width: 2),
                             ),
                           ),
                         ),

@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { AdminChangePhoneDto } from './dto/admin-change-phone.dto';
+import { AdminResetPasswordDto } from './dto/admin-reset-password.dto';
+import { Prisma } from '@prisma/client';
 
 /**
  * Cổng Quản trị Nền tảng (Luồng 1 theo đánh giá chuyên gia 27/10/2026).
@@ -53,20 +55,31 @@ export class AdminService {
     return { data: { lineages }, error: null };
   }
 
-  /** Tra tài khoản theo số ĐT (khớp phần cuối, tối thiểu 6 số). */
-  async findUsers(userId: string, phone: string) {
+  /**
+   * Tra tài khoản theo email (có "@", khớp một phần) hoặc số ĐT (khớp phần
+   * cuối, tối thiểu 6 số).
+   */
+  async findUsers(userId: string, query: string) {
     await this.requireSuperAdmin(userId);
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 6)
-      throw new BadRequestException({
-        code: 'PHONE_QUERY_TOO_SHORT',
-        message: 'Nhập ít nhất 6 chữ số cuối của số điện thoại',
-      });
+    const q = query.trim();
+    let where: Prisma.UserWhereInput;
+    if (q.includes('@')) {
+      where = { email: { contains: q.toLowerCase() } };
+    } else {
+      const digits = q.replace(/\D/g, '');
+      if (digits.length < 6)
+        throw new BadRequestException({
+          code: 'USER_QUERY_TOO_SHORT',
+          message: 'Nhập email, hoặc ít nhất 6 chữ số cuối của số điện thoại',
+        });
+      where = { phone: { endsWith: digits.slice(-9) } };
+    }
     const users = await this.prisma.user.findMany({
-      where: { phone: { endsWith: digits.slice(-9) } },
+      where,
       select: {
         id: true,
         phone: true,
+        email: true,
         displayName: true,
         status: true,
         isPlatformAdmin: true,
@@ -75,6 +88,41 @@ export class AdminService {
       take: 20,
     });
     return { data: { users }, error: null };
+  }
+
+  /**
+   * Đặt lại mật khẩu hộ người quên mật khẩu (chưa có dịch vụ gửi email).
+   * Trả mật khẩu tạm đúng 1 lần; người dùng nên đổi ngay trong Tài khoản.
+   */
+  async resetUserPassword(
+    userId: string,
+    targetId: string,
+    dto: AdminResetPasswordDto,
+  ) {
+    await this.requireSuperAdmin(userId);
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetId },
+      select: { id: true, email: true },
+    });
+    if (!target)
+      throw new NotFoundException({
+        code: 'USER_NOT_FOUND',
+        message: 'Không tìm thấy tài khoản',
+      });
+    if (!target.email)
+      throw new BadRequestException({
+        code: 'NO_EMAIL',
+        message: 'Tài khoản này chưa có email nên không đăng nhập bằng mật khẩu',
+      });
+    const tempPassword = await this.auth.resetPasswordByAdmin(
+      userId,
+      target.id,
+      dto.reason,
+    );
+    return {
+      data: { id: target.id, email: target.email, tempPassword },
+      error: null,
+    };
   }
 
   /**

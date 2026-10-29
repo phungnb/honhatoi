@@ -9,5 +9,9 @@ if [ "$VERCEL_ENV" = "preview" ]; then
   echo "[db-sync] VERCEL_ENV=preview — bỏ qua đồng bộ database"
   exit 0
 fi
-npx prisma db execute --schema prisma/schema.prisma --file prisma/sql/2026-10-28-gop-vai-tro.sql
+# Chạy mọi script trong prisma/sql theo thứ tự tên (đặt tên theo ngày).
+for f in prisma/sql/*.sql; do
+  echo "[db-sync] $f"
+  npx prisma db execute --schema prisma/schema.prisma --file "$f"
+done
 npx prisma db push --skip-generate

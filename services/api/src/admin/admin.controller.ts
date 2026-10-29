@@ -12,6 +12,7 @@ import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
 import { AdminChangePhoneDto } from './dto/admin-change-phone.dto';
+import { AdminResetPasswordDto } from './dto/admin-reset-password.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('admin')
@@ -24,8 +25,12 @@ export class AdminController {
   }
 
   @Get('users')
-  findUsers(@CurrentUserId() userId: string, @Query('phone') phone?: string) {
-    return this.admin.findUsers(userId, phone ?? '');
+  findUsers(
+    @CurrentUserId() userId: string,
+    @Query('q') q?: string,
+    @Query('phone') phone?: string,
+  ) {
+    return this.admin.findUsers(userId, q ?? phone ?? '');
   }
 
   @Post('users/:targetId/phone')
@@ -36,5 +41,15 @@ export class AdminController {
     @Body() dto: AdminChangePhoneDto,
   ) {
     return this.admin.changeUserPhone(userId, targetId, dto);
+  }
+
+  @Post('users/:targetId/password-reset')
+  @HttpCode(200)
+  resetUserPassword(
+    @CurrentUserId() userId: string,
+    @Param('targetId') targetId: string,
+    @Body() dto: AdminResetPasswordDto,
+  ) {
+    return this.admin.resetUserPassword(userId, targetId, dto);
   }
 }

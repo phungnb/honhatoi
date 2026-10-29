@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Quản trị nền tảng đổi số hộ người đã mất số cũ (không nhận được OTP).
+ * Quản trị nền tảng hỗ trợ tài khoản: đổi số hộ người mất số cũ, đặt lại
+ * mật khẩu cho người quên (chưa có dịch vụ gửi email).
  * Người vận hành phải tự xác minh danh tính ngoài hệ thống trước; lý do
  * được ghi vào nhật ký. Tài khoản bị đăng xuất khỏi mọi thiết bị.
  */
@@ -14,6 +15,7 @@ import { apiMessage } from "@/lib/errors";
 interface FoundUser {
   id: string;
   phone: string | null;
+  email: string | null;
   displayName: string;
   status: string;
 }
@@ -46,7 +48,7 @@ export default function DoiSoHo() {
     setTarget(null);
     try {
       const b = await get<{ data?: { users?: FoundUser[] } }>(
-        `/admin/users?phone=${encodeURIComponent(query.trim())}`,
+        `/admin/users?q=${encodeURIComponent(query.trim())}`,
       );
       setUsers(b?.data?.users ?? []);
     } catch (e) {
@@ -79,10 +81,33 @@ export default function DoiSoHo() {
     }
   }
 
+  async function resetPassword() {
+    if (!target) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const b = await post<{ data?: { tempPassword?: string } }>(
+        `/admin/users/${target.id}/password-reset`,
+        { reason: reason.trim() },
+      );
+      setDone(
+        `Mật khẩu tạm của ${target.displayName} (${target.email}): ${b?.data?.tempPassword}. Chỉ hiện một lần — chuyển cho người dùng và nhắc họ đổi ngay trong Tài khoản.`,
+      );
+      setTarget(null);
+      setUsers(null);
+      setReason("");
+    } catch (e) {
+      setError(apiMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="card section-gap" style={{ maxWidth: 560 }}>
-      <h2 className="card-title">Đổi số hộ người mất số cũ</h2>
+      <h2 className="card-title">Hỗ trợ tài khoản</h2>
       <p className="muted-text">
+        Đổi số cho người mất số cũ, hoặc đặt lại mật khẩu cho người quên.
         Chỉ làm sau khi đã xác minh danh tính (gọi video, đối chiếu CCCD…).
         Tài khoản giữ nguyên vai trò, bị đăng xuất khỏi mọi thiết bị.
       </p>
@@ -90,12 +115,11 @@ export default function DoiSoHo() {
       {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
 
       <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
-        Số cũ (ít nhất 6 số cuối)
+        Email, hoặc ít nhất 6 số cuối của số điện thoại
         <input
           style={inputStyle}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          inputMode="tel"
         />
       </label>
       <div className="btn-row" style={{ marginTop: 12 }}>
@@ -113,7 +137,7 @@ export default function DoiSoHo() {
         <div className="btn-row" style={{ marginTop: 12, flexWrap: "wrap" }}>
           {users.map((u) => (
             <button key={u.id} className="btn" onClick={() => setTarget(u)}>
-              {u.displayName} · {u.phone ?? "chưa có số"}
+              {u.displayName} · {u.phone ?? u.email ?? "—"}
             </button>
           ))}
         </div>
@@ -122,11 +146,11 @@ export default function DoiSoHo() {
       {target && (
         <>
           <p style={{ marginTop: 12 }}>
-            Đổi số cho <strong>{target.displayName}</strong> (
-            {target.phone ?? "chưa có số"})
+            <strong>{target.displayName}</strong> · số{" "}
+            {target.phone ?? "chưa có"} · email {target.email ?? "chưa có"}
           </p>
           <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
-            Số mới
+            Số mới (chỉ khi đổi số)
             <input
               style={inputStyle}
               value={newPhone}
@@ -151,6 +175,15 @@ export default function DoiSoHo() {
             >
               Đổi số
             </button>
+            {target.email && (
+              <button
+                className="btn"
+                disabled={busy || !reason.trim()}
+                onClick={() => void resetPassword()}
+              >
+                Đặt lại mật khẩu
+              </button>
+            )}
             <button className="btn" onClick={() => setTarget(null)}>
               Hủy
             </button>
