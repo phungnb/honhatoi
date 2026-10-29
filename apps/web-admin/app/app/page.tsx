@@ -1,5 +1,5 @@
-import KhongGianConChau from "@/components/KhongGianConChau";
+import TrangChu from "@/components/TrangChu";
 
 export default function AppHomePage() {
-  return <KhongGianConChau />;
+  return <TrangChu />;
 }

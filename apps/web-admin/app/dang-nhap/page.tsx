@@ -10,9 +10,8 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { get, post, saveTokens } from "@/lib/api";
+import { post, saveTokens } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
-import { MyLineage, canManageLineage } from "@/lib/roles";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
@@ -76,12 +75,8 @@ export default function DangNhapPage() {
       router.push(`/app?ma=${encodeURIComponent(ma)}`);
       return;
     }
-    // Có vai trò quản lý ở ít nhất 1 họ → cổng quản lý; còn lại → con cháu.
-    const mine = await get<{ data?: { lineages?: MyLineage[] } }>(
-      "/lineages?limit=100",
-    ).catch(() => null);
-    const manages = (mine?.data?.lineages ?? []).some(canManageLineage);
-    router.push(manages ? "/quan-ly" : "/app");
+    // Ai cũng vào Trang chủ; người quản lý có lối tắt Quản lý ở đó.
+    router.push("/app");
   }
 
   async function run(action: () => Promise<void>) {
