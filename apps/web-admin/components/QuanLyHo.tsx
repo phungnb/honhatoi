@@ -2,7 +2,8 @@
 
 /**
  * Cổng quản lý dòng họ — MỘT nơi cho mọi việc quản trị của một họ:
- * duyệt đề xuất gia phả, duyệt người vào họ, thành viên & vai trò, mã mời.
+ * dựng cây gia phả, duyệt đề xuất, duyệt người vào họ, thành viên & vai
+ * trò, mã mời.
  * Mục hiện theo vai trò (Người giữ gia phả / Ban quản trị / Trưởng tộc);
  * backend vẫn kiểm tra quyền ở mọi API.
  */
@@ -17,8 +18,9 @@ import {
   type LineageRole,
 } from "@/lib/roles";
 import DuyetXacMinh from "@/components/DuyetXacMinh";
+import SuaGiaPha from "@/components/SuaGiaPha";
 
-type Tab = "proposals" | "requests" | "members" | "invites";
+type Tab = "tree" | "proposals" | "requests" | "members" | "invites";
 
 interface JoinRequest {
   id: string;
@@ -73,7 +75,7 @@ const selectStyle = {
 export default function QuanLyHo({ lineageId }: { lineageId: string }) {
   const [me, setMe] = useState<MyLineage | null>(null);
   const [myUserId, setMyUserId] = useState<string>("");
-  const [tab, setTab] = useState<Tab>("proposals");
+  const [tab, setTab] = useState<Tab>("tree");
   const [state, setState] = useState<"loading" | "ready" | "unauthorized" | "forbidden">("loading");
 
   useEffect(() => {
@@ -115,6 +117,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
 
   const admin = isLineageAdmin(me);
   const tabs: { key: Tab; label: string; show: boolean }[] = [
+    { key: "tree", label: "Dựng cây gia phả", show: true },
     { key: "proposals", label: "Duyệt đề xuất gia phả", show: true },
     { key: "requests", label: "Yêu cầu vào họ", show: admin },
     { key: "members", label: "Thành viên & vai trò", show: true },
@@ -148,6 +151,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
       </div>
 
       <div className="section-gap">
+        {tab === "tree" && <SuaGiaPha lineageId={lineageId} />}
         {tab === "proposals" && <DuyetXacMinh lockedLineageId={lineageId} embedded />}
         {tab === "requests" && admin && (
           <JoinRequests lineageId={lineageId} isOwner={me.isOwner === true} />
