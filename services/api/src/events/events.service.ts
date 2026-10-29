@@ -139,7 +139,7 @@ export class EventsService {
         organizerId: userId,
         title: dto.title,
         description: dto.description,
-        eventType: dto.eventType as EventType,
+        eventType: dto.eventType.toUpperCase() as EventType,
         startAt,
         endAt,
         lunarDate: dto.lunarDate,
@@ -288,7 +288,7 @@ export class EventsService {
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.eventType !== undefined
-          ? { eventType: dto.eventType as EventType }
+          ? { eventType: dto.eventType.toUpperCase() as EventType }
           : {}),
         ...(startAt !== undefined ? { startAt } : {}),
         ...(dto.endAt !== undefined ? { endAt } : {}),

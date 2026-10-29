@@ -197,6 +197,10 @@ export default function TrangChu() {
             <div className="sub">Dựng cây, duyệt đề xuất</div>
           </Link>
         )}
+        <Link className="action" href="/app/tin-nhan">
+          Nhắn tin
+          <div className="sub">Nhóm chat cả họ, nhắn riêng</div>
+        </Link>
         {admin && current && (
           <Link className="action" href={`/quan-ly/${current.id}?tab=invites`}>
             Mời người thân
@@ -228,7 +232,10 @@ export default function TrangChu() {
       {current && <GioSapToi lineageId={current.id} />}
 
       <div className="card section-gap">
-        <h2 className="card-title">Sự kiện sắp tới</h2>
+        <div className="btn-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <h2 className="card-title">Sự kiện sắp tới</h2>
+          <Link href="/app/su-kien">Xem tất cả</Link>
+        </div>
         {events === null ? (
           <p className="muted-text">Đang tải…</p>
         ) : events.length === 0 ? (
@@ -236,7 +243,7 @@ export default function TrangChu() {
         ) : (
           <div className="list">
             {events.map((e) => (
-              <div key={e.id} className="list-item" style={{ cursor: "default" }}>
+              <Link key={e.id} href="/app/su-kien" className="list-item">
                 <span className="grow">
                   <strong>{e.title}</strong>
                   <span className="sub" style={{ display: "block" }}>
@@ -245,7 +252,7 @@ export default function TrangChu() {
                     {e.location ? ` · ${e.location}` : ""}
                   </span>
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         )}
