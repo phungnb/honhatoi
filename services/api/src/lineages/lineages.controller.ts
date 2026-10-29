@@ -84,6 +84,15 @@ export class LineagesController {
     });
   }
 
+  /** Vào họ chỉ bằng mã mời (người mới không biết id họ). */
+  @Post('join-by-code')
+  joinByCodeOnly(
+    @CurrentUserId() userId: string,
+    @Body() dto: JoinByCodeDto,
+  ) {
+    return this.lineages.joinByCode(null, userId, dto.code);
+  }
+
   // NOTE: join và join-by-code KHÔNG qua LineageGuard vì user chưa là thành viên.
   @Post(':lineageId/join-requests')
   join(

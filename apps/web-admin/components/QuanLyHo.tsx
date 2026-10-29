@@ -473,6 +473,21 @@ function Invites({ lineageId }: { lineageId: string }) {
           <span className="muted-text">
             (hết hạn {fmtDate(created.expiresAt)}, tối đa {created.maxUses ?? "không giới hạn"} người)
           </span>
+          <br />
+          <span className="muted-text">
+            Gửi link này qua Zalo, người nhận đăng nhập là vào họ:{" "}
+            <code>{`${window.location.origin}/app?ma=${created.code}`}</code>{" "}
+            <button
+              className="btn"
+              onClick={() =>
+                void navigator.clipboard?.writeText(
+                  `${window.location.origin}/app?ma=${created.code}`,
+                )
+              }
+            >
+              Chép link
+            </button>
+          </span>
         </p>
       )}
     </div>

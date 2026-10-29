@@ -633,14 +633,17 @@ export class LineagesService {
     return { data: { invite }, error: null };
   }
 
-  /** POST /lineages/:id/join-by-code — tham gia bằng mã mời (kể cả họ private). */
-  async joinByCode(lineageId: string, userId: string, code: string) {
+  /**
+   * POST /lineages/:id/join-by-code hoặc POST /lineages/join-by-code —
+   * tham gia bằng mã mời (kể cả họ private). Không truyền id thì suy ra từ mã.
+   */
+  async joinByCode(lineageId: string | null, userId: string, code: string) {
     const invite = await this.prisma.lineageInvite.findUnique({
-      where: { code: code.toUpperCase().trim() },
+      where: { code: code.toUpperCase().replace(/\s+/g, '') },
     });
     if (
       !invite ||
-      invite.lineageId !== lineageId ||
+      (lineageId !== null && invite.lineageId !== lineageId) ||
       invite.revokedAt ||
       (invite.expiresAt && invite.expiresAt < new Date()) ||
       (invite.maxUses != null && invite.usedCount >= invite.maxUses)
@@ -649,6 +652,8 @@ export class LineagesService {
         code: 'INVALID_INVITE_CODE',
         message: 'Mã mời không hợp lệ, đã hết hạn hoặc đã hết lượt dùng',
       });
+    // Mã mời là duy nhất toàn hệ thống nên chỉ cần mã là biết họ nào.
+    lineageId = invite.lineageId;
     const existing = await this.prisma.lineageMembership.findUnique({
       where: { lineageId_userId: { lineageId, userId } },
     });
@@ -683,6 +688,10 @@ export class LineagesService {
       });
       return m;
     });
-    return { data: { membership }, error: null };
+    const lineage = await this.prisma.lineage.findUnique({
+      where: { id: lineageId },
+      select: { id: true, name: true },
+    });
+    return { data: { membership, lineage }, error: null };
   }
 }
