@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { post, saveTokens } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 import { isInApp } from "@/lib/native";
+import { SITE } from "@/lib/site";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
@@ -67,11 +68,14 @@ export default function DangNhapPage() {
   const googleBtn = useRef<HTMLDivElement>(null);
   // Google không cho đăng nhập trong WebView của app (disallowed_useragent).
   const [showGoogle, setShowGoogle] = useState(!!GOOGLE_CLIENT_ID);
+  // Luật BVDLCN 2025 Điều 9: đồng ý phải rõ ràng (ô không tích sẵn) và lưu lại được.
+  const [agreed, setAgreed] = useState(false);
 
   async function finishLogin(body: TokenBody) {
     const access = body?.data?.accessToken;
     if (!access) throw new Error("Máy chủ không trả về token.");
     saveTokens(access, body.data?.refreshToken);
+    await post("/auth/consent", { version: SITE.policyVersion }).catch(() => undefined);
     // Đến từ link mời /app?ma=XXXX → quay lại đó để vào họ.
     const ma = new URLSearchParams(window.location.search).get("ma");
     if (ma) {
@@ -97,7 +101,7 @@ export default function DangNhapPage() {
   // Nút Google (Google Identity Services) — chỉ hiện khi đã cấu hình
   // NEXT_PUBLIC_GOOGLE_CLIENT_ID.
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
+    if (!GOOGLE_CLIENT_ID || !agreed) return;
     if (isInApp()) {
       setShowGoogle(false);
       return;
@@ -134,7 +138,7 @@ export default function DangNhapPage() {
     s.onload = render;
     document.head.appendChild(s);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [agreed]);
 
   function requestCode() {
     if (!phone.trim()) {
@@ -214,7 +218,16 @@ export default function DangNhapPage() {
       </div>
 
       <div className="card" style={{ maxWidth: 440 }}>
-        {showGoogle && (
+        <label className="dong-y">
+          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+          <span>
+            Tôi đã đọc và đồng ý với <Link href="/dieu-khoan">Điều khoản sử dụng</Link> và{" "}
+            <Link href="/quyen-rieng-tu">Chính sách quyền riêng tư</Link>, gồm việc lưu dữ liệu tại
+            Singapore.
+          </span>
+        </label>
+        <fieldset disabled={!agreed} className="dong-y-khoa">
+        {showGoogle && agreed && (
           <>
             <div ref={googleBtn} style={{ minHeight: 44 }} />
             <p
@@ -367,14 +380,11 @@ export default function DangNhapPage() {
             )}
           </>
         )}
+        </fieldset>
       </div>
       <p className="muted-text section-gap">
         Chưa biết app làm được gì? <Link href="/mau">Xem dòng họ mẫu</Link>{" "}
         — không cần đăng nhập.
-      </p>
-      <p className="muted-text" style={{ fontSize: 13 }}>
-        Đăng nhập nghĩa là bạn đồng ý với <Link href="/dieu-khoan">Điều khoản sử dụng</Link> và{" "}
-        <Link href="/quyen-rieng-tu">Chính sách quyền riêng tư</Link>.
       </p>
     </>
   );

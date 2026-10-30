@@ -11,8 +11,9 @@ export default function DieuKhoanPage() {
       <p>
         Họ Nhà Tôi là ứng dụng gia phả số: dựng cây gia phả, tính ngày giỗ âm
         lịch, tra vai vế xưng hô, tổ chức sự kiện và nhắn tin trong dòng họ.
-        Dùng app nghĩa là bạn đồng ý với điều khoản này và{" "}
-        <Link href="/quyen-rieng-tu">Chính sách quyền riêng tư</Link>.
+        Bạn xác nhận đồng ý với điều khoản này và{" "}
+        <Link href="/quyen-rieng-tu">Chính sách quyền riêng tư</Link> bằng ô đồng ý khi đăng nhập lần
+        đầu.
       </p>
 
       <h2>2. Tài khoản</h2>
@@ -61,8 +62,8 @@ export default function DieuKhoanPage() {
 
       <h2>6. Thay đổi điều khoản</h2>
       <p>
-        Khi điều khoản thay đổi, chúng tôi cập nhật ngày ở đầu trang. Tiếp tục
-        dùng app sau thay đổi nghĩa là bạn đồng ý với bản mới.
+        Khi điều khoản thay đổi, chúng tôi cập nhật ngày ở đầu trang và hỏi lại
+        sự đồng ý của bạn trong app trước khi tiếp tục.
       </p>
     </TrangVanBan>
   );

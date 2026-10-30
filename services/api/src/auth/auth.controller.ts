@@ -13,6 +13,7 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import {
+  ConsentDto,
   EmailLoginDto,
   EmailRegisterDto,
   GoogleLoginDto,
@@ -60,6 +61,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUserId() userId: string) {
     return this.auth.me(userId);
+  }
+
+  @Post('consent')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  consent(@CurrentUserId() userId: string, @Body() dto: ConsentDto) {
+    return this.auth.recordConsent(userId, dto);
   }
 
   @Delete('me')

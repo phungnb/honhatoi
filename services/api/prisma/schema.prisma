@@ -95,6 +95,10 @@ model User {
   /// Chống dò mật khẩu: sai 5 lần liên tiếp thì khóa 15 phút.
   failedLoginCount Int      @default(0) @map("failed_login_count")
   lockedUntil     DateTime? @map("locked_until") @db.Timestamptz(6)
+  /// Lần cuối đồng ý Điều khoản + Chính sách quyền riêng tư (Luật BVDLCN
+  /// 2025 Điều 9: đồng ý phải kiểm chứng được) và phiên bản chính sách đã đồng ý.
+  privacyConsentAt      DateTime? @map("privacy_consent_at") @db.Timestamptz(6)
+  privacyConsentVersion String?   @map("privacy_consent_version") @db.VarChar(20)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(6)

@@ -80,3 +80,10 @@ export class GoogleLoginDto {
   @IsString()
   devicePlatform?: string;
 }
+
+/** Ghi nhận đồng ý Điều khoản + Chính sách quyền riêng tư (phiên bản đang hiển thị). */
+export class ConsentDto {
+  @IsString()
+  @MaxLength(20)
+  version: string;
+}

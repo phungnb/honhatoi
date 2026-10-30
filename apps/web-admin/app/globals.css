@@ -764,3 +764,30 @@ tbody tr:hover {
   display: grid;
   place-items: center;
 }
+
+/* Ô đồng ý điều khoản (trang đăng nhập, hộp hỏi lại) */
+.dong-y {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dong-y input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin-top: 1px;
+  accent-color: var(--brand);
+}
+.dong-y-khoa {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.dong-y-khoa:disabled {
+  opacity: 0.45;
+}

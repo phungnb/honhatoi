@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { get, getAccessToken } from "@/lib/api";
 import { MyLineage, canManageLineage } from "@/lib/roles";
+import { SITE } from "@/lib/site";
+import HoiDongY from "@/components/HoiDongY";
 
 /**
  * Điều hướng chung cho mọi luồng (con cháu, quản lý, nền tảng): sidebar
@@ -17,6 +19,7 @@ export default function Sidebar() {
   const [platformAdmin, setPlatformAdmin] = useState(false);
   const [manages, setManages] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [needConsent, setNeedConsent] = useState(false);
 
   const loadUnread = useCallback(() => {
     if (!getAccessToken()) return;
@@ -31,8 +34,13 @@ export default function Sidebar() {
       return;
     }
     setLoggedIn(true);
-    get<{ data?: { user?: { isPlatformAdmin?: boolean } } }>("/auth/me")
-      .then((b) => setPlatformAdmin(b?.data?.user?.isPlatformAdmin === true))
+    get<{ data?: { user?: { isPlatformAdmin?: boolean; privacyConsentVersion?: string | null } } }>(
+      "/auth/me",
+    )
+      .then((b) => {
+        setPlatformAdmin(b?.data?.user?.isPlatformAdmin === true);
+        setNeedConsent(b?.data?.user?.privacyConsentVersion !== SITE.policyVersion);
+      })
       .catch(() => setLoggedIn(false));
     get<{ data?: { lineages?: MyLineage[] } }>("/lineages?limit=100")
       .then((b) => setManages((b?.data?.lineages ?? []).some(canManageLineage)))
@@ -129,6 +137,10 @@ export default function Sidebar() {
           </div>
         </div>
       </aside>
+
+      {loggedIn && needConsent && !["/dieu-khoan", "/quyen-rieng-tu"].includes(pathname) && (
+        <HoiDongY onDone={() => setNeedConsent(false)} />
+      )}
 
       <nav className="bottom-nav" aria-label="Điều hướng">
         {items
