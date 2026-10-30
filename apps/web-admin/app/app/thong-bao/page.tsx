@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { get, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 
@@ -13,6 +14,18 @@ interface Item {
   body?: string | null;
   isRead: boolean;
   createdAt: string;
+  type?: string;
+  data?: { lineageId?: string } | null;
+}
+
+/** Trang cần mở khi bấm vào thông báo, theo loại. */
+function linkOf(n: Item): string | null {
+  const t = n.type ?? "";
+  if (t === "report_new" && n.data?.lineageId) return `/quan-ly/${n.data.lineageId}?tab=reports`;
+  if (t.startsWith("post_")) return "/app/dong-ho";
+  if (t.startsWith("event_")) return "/app/su-kien";
+  if (t.startsWith("genealogy_")) return "/app/gia-pha";
+  return null;
 }
 
 function ago(iso: string): string {
@@ -27,6 +40,7 @@ function ago(iso: string): string {
 export default function ThongBaoPage() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +59,8 @@ export default function ThongBaoPage() {
   }, [load]);
 
   async function read(n: Item) {
+    const href = linkOf(n);
+    if (href) router.push(href);
     if (n.isRead) return;
     setItems((xs) => xs?.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)) ?? null);
     await post(`/notifications/${n.id}/read`, {}).catch(() => undefined);

@@ -514,6 +514,8 @@ model Message {
   editedAt           DateTime?         @map("edited_at") @db.Timestamptz(6)
   recalledAt         DateTime?         @map("recalled_at") @db.Timestamptz(6)
   deletedForAllAt    DateTime?         @map("deleted_for_all_at") @db.Timestamptz(6)
+  pinnedAt           DateTime?         @map("pinned_at") @db.Timestamptz(6)
+  pinnedBy           String?           @map("pinned_by") @db.Uuid
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
   attachments MessageAttachment[]
@@ -625,6 +627,8 @@ model Report {
   reporter   User?     @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
   targetType String    @map("target_type") @db.VarChar(20)
   targetId   String    @map("target_id") @db.Uuid
+  /// Dòng họ chứa nội dung bị báo cáo — để quản trị họ xử lý (null: báo cáo người dùng).
+  lineageId  String?   @map("lineage_id") @db.Uuid
   reason     String    @db.VarChar(100)
   details    String?   @db.Text
   status     String    @default("pending") @db.VarChar(20)
@@ -633,6 +637,7 @@ model Report {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  @@index([lineageId, status])
   @@map("reports")
 }
 

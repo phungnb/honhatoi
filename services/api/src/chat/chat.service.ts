@@ -24,6 +24,25 @@ const TYPE_MAP: Record<string, ChatRoomType> = {
   family_group: ChatRoomType.FAMILY_GROUP,
 };
 
+/** Dữ liệu kèm theo mỗi tin: người gửi, tin được trả lời, cảm xúc. */
+const MESSAGE_INCLUDE = {
+  sender: { select: { id: true, displayName: true } },
+  replyTo: {
+    select: {
+      id: true,
+      content: true,
+      senderNameSnapshot: true,
+      recalledAt: true,
+      deletedForAllAt: true,
+      sender: { select: { displayName: true } },
+    },
+  },
+  reactions: { select: { emoji: true, userId: true } },
+} as const;
+
+/** Số tin ghim tối đa mỗi cuộc trò chuyện. */
+const MAX_PINNED = 5;
+
 /** Vai trò được coi là quản trị dòng họ (dùng cho quyền quản lý conversation). */
 const LINEAGE_ADMIN_ROLES: LineageRole[] = [LineageRole.ADMIN];
 
@@ -48,6 +67,11 @@ export class ChatService {
   }
 
   private async isLineageAdmin(lineageId: string, userId: string): Promise<boolean> {
+    const owner = await this.prisma.lineage.findFirst({
+      where: { id: lineageId, ownerUserId: userId },
+      select: { id: true },
+    });
+    if (owner) return true;
     const m = await this.prisma.lineageMembership.findFirst({
       where: {
         lineageId,
@@ -70,6 +94,23 @@ export class ChatService {
         message: 'Bạn không phải thành viên của cuộc trò chuyện này',
       });
     return m;
+  }
+
+  /** Một trong hai người đã chặn người kia → 403 (không nói rõ ai chặn ai). */
+  private async requireNotBlocked(a: string, b: string) {
+    const block = await this.prisma.blockedUser.findFirst({
+      where: {
+        OR: [
+          { blockerId: a, blockedId: b },
+          { blockerId: b, blockedId: a },
+        ],
+      },
+    });
+    if (block)
+      throw new ForbiddenException({
+        code: 'USER_BLOCKED',
+        message: 'Không thể nhắn tin với người này',
+      });
   }
 
   /** Conversation còn tồn tại (chưa xóa mềm) — 404 nếu không. */
@@ -110,7 +151,8 @@ export class ChatService {
   }
 
   /** Chuẩn hoá message trả về: ẩn content khi đã thu hồi/xóa, kèm tên người gửi. */
-  private presentMessage(m: {
+  private presentMessage(
+    m: {
     id: string;
     conversationId: string;
     senderId?: string | null;
@@ -124,9 +166,30 @@ export class ChatService {
     editedAt?: Date | null;
     recalledAt?: Date | null;
     deletedForAllAt?: Date | null;
+    pinnedAt?: Date | null;
     createdAt: Date;
-  }) {
+    replyTo?: {
+      id: string;
+      content: string | null;
+      senderNameSnapshot: string | null;
+      recalledAt: Date | null;
+      deletedForAllAt: Date | null;
+      sender: { displayName: string } | null;
+    } | null;
+    reactions?: { emoji: string; userId: string }[];
+  },
+    me?: string,
+  ) {
     const recalled = !!(m.recalledAt || m.deletedForAllAt);
+    const r = m.replyTo;
+    const replyGone = !!(r && (r.recalledAt || r.deletedForAllAt));
+    const agg = new Map<string, { count: number; reactedByMe: boolean }>();
+    for (const x of m.reactions ?? []) {
+      const e = agg.get(x.emoji) ?? { count: 0, reactedByMe: false };
+      e.count += 1;
+      if (me && x.userId === me) e.reactedByMe = true;
+      agg.set(x.emoji, e);
+    }
     return {
       id: m.id,
       conversationId: m.conversationId,
@@ -137,6 +200,16 @@ export class ChatService {
       content: recalled ? null : (m.content ?? null),
       recalled,
       replyToId: m.replyToId ?? null,
+      replyTo: r
+        ? {
+            id: r.id,
+            senderName: r.sender?.displayName ?? r.senderNameSnapshot ?? null,
+            content: replyGone ? null : (r.content ?? '').slice(0, 200),
+            recalled: replyGone,
+          }
+        : null,
+      reactions: [...agg.entries()].map(([emoji, v]) => ({ emoji, ...v })),
+      pinnedAt: m.pinnedAt ?? null,
       status: m.status,
       editedAt: m.editedAt ?? null,
       recalledAt: m.recalledAt ?? null,
@@ -202,6 +275,7 @@ export class ChatService {
         }
       }
 
+      await this.requireNotBlocked(userId, otherId);
       const peer = await this.prisma.user.findUnique({
         where: { id: otherId },
       });
@@ -334,7 +408,7 @@ export class ChatService {
     for (const c of conversations) {
       const lastMessage = await this.prisma.message.findFirst({
         where: { conversationId: c.id },
-        include: { sender: { select: { id: true, displayName: true } } },
+        include: MESSAGE_INCLUDE,
         orderBy: { createdAt: 'desc' },
       });
       // Tin chưa đọc: tin của người khác mà user chưa có MessageRead.
@@ -355,7 +429,7 @@ export class ChatService {
         ...c,
         members: members.map((m) => ({ userId: m.userId, displayName: m.user.displayName })),
         myRole: roleByConv.get(c.id) ?? 'member',
-        lastMessage: lastMessage ? this.presentMessage(lastMessage) : null,
+        lastMessage: lastMessage ? this.presentMessage(lastMessage, userId) : null,
         unreadCount,
       });
     }
@@ -380,10 +454,11 @@ export class ChatService {
   async getMessages(
     userId: string,
     conversationId: string,
-    query: { cursor?: string; limit?: number },
+    query: { cursor?: string; limit?: number; q?: string },
   ) {
     await this.requireConversation(conversationId);
     await this.requireActiveMember(conversationId, userId);
+    const q = query.q?.trim().slice(0, 100);
 
     let cursorFilter: Record<string, unknown> = {};
     if (query.cursor) {
@@ -402,16 +477,33 @@ export class ChatService {
 
     const take = Math.min(Math.max(query.limit ?? 30, 1), 50);
     const messages = await this.prisma.message.findMany({
-      where: { conversationId, ...cursorFilter },
-      include: { sender: { select: { id: true, displayName: true } } },
+      where: {
+        conversationId,
+        ...cursorFilter,
+        ...(q
+          ? { content: { contains: q, mode: 'insensitive' as const }, recalledAt: null, deletedForAllAt: null }
+          : {}),
+      },
+      include: MESSAGE_INCLUDE,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: take + 1,
     });
     const hasMore = messages.length > take;
     const page = messages.slice(0, take);
+    // Tin ghim chỉ cần ở trang đầu (không tìm kiếm, không cursor).
+    const pinned =
+      query.cursor || q
+        ? undefined
+        : await this.prisma.message.findMany({
+            where: { conversationId, pinnedAt: { not: null }, recalledAt: null, deletedForAllAt: null },
+            include: MESSAGE_INCLUDE,
+            orderBy: { pinnedAt: 'desc' },
+            take: MAX_PINNED,
+          });
     return {
       data: {
-        messages: page.map((m) => this.presentMessage(m)),
+        messages: page.map((m) => this.presentMessage(m, userId)),
+        pinned: pinned?.map((m) => this.presentMessage(m, userId)),
         next_cursor: hasMore ? page[page.length - 1].id : null,
       },
       error: null,
@@ -428,8 +520,15 @@ export class ChatService {
     senderId: string,
     dto: SendMessageDto,
   ) {
-    await this.requireConversation(conversationId);
+    const conv = await this.requireConversation(conversationId);
     await this.requireActiveMember(conversationId, senderId);
+    if (conv.type === ChatRoomType.DIRECT) {
+      const peer = await this.prisma.conversationMember.findFirst({
+        where: { conversationId, NOT: { userId: senderId } },
+        select: { userId: true },
+      });
+      if (peer) await this.requireNotBlocked(senderId, peer.userId);
+    }
 
     const existing = await this.prisma.message.findUnique({
       where: {
@@ -438,10 +537,10 @@ export class ChatService {
           clientMessageId: dto.clientMessageId,
         },
       },
-      include: { sender: { select: { id: true, displayName: true } } },
+      include: MESSAGE_INCLUDE,
     });
     if (existing)
-      return { data: { message: this.presentMessage(existing), duplicate: true }, error: null };
+      return { data: { message: this.presentMessage(existing, senderId), duplicate: true }, error: null };
 
     if (dto.type === 'text' && !dto.content?.trim())
       throw new BadRequestException({
@@ -485,11 +584,11 @@ export class ChatService {
     // Lấy lại kèm sender để trả về (stub typecheck không cho include trong create).
     const withSender = await this.prisma.message.findUnique({
       where: { id: message.id },
-      include: { sender: { select: { id: true, displayName: true } } },
+      include: MESSAGE_INCLUDE,
     });
     return {
       data: {
-        message: this.presentMessage(withSender ?? message),
+        message: this.presentMessage(withSender ?? message, senderId),
         duplicate: false,
       },
       error: null,
@@ -500,7 +599,7 @@ export class ChatService {
   async editMessage(userId: string, messageId: string, content: string) {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
-      include: { sender: { select: { id: true, displayName: true } } },
+      include: MESSAGE_INCLUDE,
     });
     if (!message)
       throw new NotFoundException({
@@ -528,16 +627,16 @@ export class ChatService {
     });
     const updated = await this.prisma.message.findUnique({
       where: { id: messageId },
-      include: { sender: { select: { id: true, displayName: true } } },
+      include: MESSAGE_INCLUDE,
     });
-    return { data: { message: this.presentMessage(updated ?? message) }, error: null };
+    return { data: { message: this.presentMessage(updated ?? message, userId) }, error: null };
   }
 
   /** POST /chat/messages/:id/recall — chỉ người gửi được thu hồi. */
   async recallMessage(userId: string, messageId: string) {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
-      include: { sender: { select: { id: true, displayName: true } } },
+      include: MESSAGE_INCLUDE,
     });
     if (!message)
       throw new NotFoundException({
@@ -550,16 +649,16 @@ export class ChatService {
         message: 'Chỉ người gửi mới được thu hồi tin nhắn này',
       });
     if (message.recalledAt)
-      return { data: { message: this.presentMessage(message) }, error: null };
+      return { data: { message: this.presentMessage(message, userId) }, error: null };
     await this.prisma.message.update({
       where: { id: messageId },
       data: { recalledAt: new Date(), content: null, status: 'recalled' },
     });
     const updated = await this.prisma.message.findUnique({
       where: { id: messageId },
-      include: { sender: { select: { id: true, displayName: true } } },
+      include: MESSAGE_INCLUDE,
     });
-    return { data: { message: this.presentMessage(updated ?? message) }, error: null };
+    return { data: { message: this.presentMessage(updated ?? message, userId) }, error: null };
   }
 
   /**
@@ -784,6 +883,82 @@ export class ChatService {
       data: { leftAt: new Date() },
     });
     return { data: { left: true }, error: null };
+  }
+
+  // ------------------------------------------------------------ ghim tin
+
+  /**
+   * POST /chat/messages/:id/pin — ghim/bỏ ghim. Nhóm cả họ chỉ quản trị
+   * được ghim (tin ghim hiện cho mọi người); nhóm nhỏ và chat 1-1 thì thành
+   * viên nào cũng ghim được. Tối đa MAX_PINNED tin.
+   */
+  async pinMessage(userId: string, messageId: string, pinned: boolean) {
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message)
+      throw new NotFoundException({ code: 'MESSAGE_NOT_FOUND', message: 'Không tìm thấy tin nhắn' });
+    const conv = await this.requireConversation(message.conversationId);
+    await this.requireActiveMember(conv.id, userId);
+    if (conv.type === ChatRoomType.LINEAGE_GROUP)
+      await this.requireConversationManager(conv.id, conv.lineageId ?? undefined, userId);
+    if (message.recalledAt || message.deletedForAllAt)
+      throw new BadRequestException({ code: 'MESSAGE_RECALLED', message: 'Tin nhắn đã thu hồi' });
+    if (pinned && !message.pinnedAt) {
+      const count = await this.prisma.message.count({
+        where: { conversationId: conv.id, pinnedAt: { not: null }, recalledAt: null },
+      });
+      if (count >= MAX_PINNED)
+        throw new BadRequestException({
+          code: 'PIN_LIMIT',
+          message: `Chỉ ghim tối đa ${MAX_PINNED} tin — hãy bỏ ghim bớt`,
+        });
+    }
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: pinned ? { pinnedAt: message.pinnedAt ?? new Date(), pinnedBy: userId } : { pinnedAt: null, pinnedBy: null },
+    });
+    return { data: { messageId, pinned }, error: null };
+  }
+
+  // ------------------------------------------------------------ chặn
+
+  /** GET /chat/blocks — danh sách người mình đã chặn. */
+  async listBlocks(userId: string) {
+    const rows = await this.prisma.blockedUser.findMany({
+      where: { blockerId: userId },
+      include: { blocked: { select: { id: true, displayName: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return {
+      data: {
+        blocks: rows.map((r) => ({
+          userId: r.blockedId,
+          displayName: r.blocked.displayName,
+          createdAt: r.createdAt,
+        })),
+      },
+      error: null,
+    };
+  }
+
+  /** POST /chat/blocks — chặn: người kia không nhắn riêng được cho mình nữa. */
+  async block(userId: string, targetId: string, reason?: string) {
+    if (targetId === userId)
+      throw new BadRequestException({ code: 'BLOCK_SELF', message: 'Không thể tự chặn chính mình' });
+    const target = await this.prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
+    if (!target)
+      throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'Không tìm thấy người dùng' });
+    await this.prisma.blockedUser.upsert({
+      where: { blockerId_blockedId: { blockerId: userId, blockedId: targetId } },
+      create: { blockerId: userId, blockedId: targetId, reason: reason?.slice(0, 500) },
+      update: {},
+    });
+    return { data: { blocked: true }, error: null };
+  }
+
+  /** DELETE /chat/blocks/:userId — bỏ chặn. */
+  async unblock(userId: string, targetId: string) {
+    await this.prisma.blockedUser.deleteMany({ where: { blockerId: userId, blockedId: targetId } });
+    return { data: { blocked: false }, error: null };
   }
 
   /** Kiểm tra user có phải thành viên đang hoạt động không (dùng cho gateway). */

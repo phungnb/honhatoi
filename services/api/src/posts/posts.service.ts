@@ -262,6 +262,7 @@ export class PostsService {
           content: c.content,
           createdAt: c.createdAt,
           author: { id: c.author?.id ?? null, name: c.author?.displayName ?? 'Người dùng đã xóa' },
+          isMine: c.authorId === userId,
           canDelete: c.authorId === userId || isAdmin,
         })),
       },

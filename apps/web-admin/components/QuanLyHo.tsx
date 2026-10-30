@@ -18,9 +18,10 @@ import {
   type LineageRole,
 } from "@/lib/roles";
 import DuyetXacMinh from "@/components/DuyetXacMinh";
+import BaoCaoViPham from "@/components/BaoCaoViPham";
 import SuaGiaPha from "@/components/SuaGiaPha";
 
-type Tab = "tree" | "proposals" | "requests" | "members" | "invites";
+type Tab = "tree" | "proposals" | "requests" | "members" | "invites" | "reports";
 
 interface JoinRequest {
   id: string;
@@ -79,7 +80,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
   // Mở thẳng một tab từ link, VD /quan-ly/:id?tab=invites (từ Trang chủ).
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "invites" || t === "members" || t === "requests" || t === "proposals") setTab(t);
+    if (t === "invites" || t === "members" || t === "requests" || t === "proposals" || t === "reports") setTab(t);
   }, []);
   const [state, setState] = useState<"loading" | "ready" | "unauthorized" | "forbidden">("loading");
 
@@ -127,6 +128,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
     { key: "requests", label: "Yêu cầu vào họ", show: admin },
     { key: "members", label: "Thành viên & vai trò", show: true },
     { key: "invites", label: "Mã mời", show: admin },
+    { key: "reports", label: "Báo cáo vi phạm", show: admin },
   ];
 
   return (
@@ -165,6 +167,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
           <Members lineageId={lineageId} me={me} myUserId={myUserId} />
         )}
         {tab === "invites" && admin && <Invites lineageId={lineageId} />}
+        {tab === "reports" && admin && <BaoCaoViPham lineageId={lineageId} />}
       </div>
     </>
   );
