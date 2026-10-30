@@ -413,8 +413,16 @@ export class GenealogyService {
     const person = await this.getPersonOrThrow(personId);
     const perm = await this.effectivePerm(person.lineageId, userId);
     this.require(perm, 'canView', 'xem hồ sơ');
+    const link = await this.prisma.personAccountLink.findUnique({
+      where: { personId },
+      include: { user: { select: { displayName: true } } },
+    });
+    const shownLink =
+      link && (link.status === 'approved' || link.userId === userId)
+        ? { status: link.status, mine: link.userId === userId, displayName: link.user.displayName }
+        : null;
     return {
-      data: { person: this.sanitize(person, perm.canEdit) },
+      data: { person: { ...this.sanitize(person, perm.canEdit), accountLink: shownLink } },
       error: null,
     };
   }
@@ -1476,6 +1484,155 @@ export class GenealogyService {
     );
     return {
       data: { today, anniversaries: rows.slice(0, limit) },
+      error: null,
+    };
+  }
+
+  // ------------------------------------------------- liên kết tài khoản
+
+  /** Người duyệt liên kết: Trưởng tộc + Ban quản trị + Người giữ gia phả. */
+  private async verifierIds(lineageId: string, except: string) {
+    const [lineage, ms] = await Promise.all([
+      this.prisma.lineage.findUnique({ where: { id: lineageId }, select: { ownerUserId: true } }),
+      this.prisma.lineageMembership.findMany({
+        where: { lineageId, status: 'approved', role: { in: ['ADMIN', 'EDITOR'] } },
+        select: { userId: true },
+      }),
+    ]);
+    return [...new Set([lineage?.ownerUserId, ...ms.map((m) => m.userId)])].filter(
+      (id): id is string => !!id && id !== except,
+    );
+  }
+
+  /**
+   * POST /genealogy/persons/:id/claim — "Đây là tôi": gắn tài khoản với một
+   * hồ sơ trong cây. Mỗi hồ sơ một tài khoản, mỗi tài khoản một hồ sơ trong
+   * một họ. Người có quyền sửa gia phả được gắn ngay; thành viên chờ duyệt.
+   */
+  async claimPerson(personId: string, userId: string) {
+    const person = await this.getPersonOrThrow(personId);
+    const perm = await this.effectivePerm(person.lineageId, userId);
+    this.require(perm, 'canPropose', 'nhận hồ sơ');
+    if (person.dateOfDeath)
+      throw new BadRequestException({
+        code: 'PERSON_DECEASED',
+        message: 'Không thể gắn tài khoản với hồ sơ người đã mất',
+      });
+    const existing = await this.prisma.personAccountLink.findUnique({ where: { personId } });
+    if (existing && existing.status !== 'rejected') {
+      if (existing.userId === userId) return { data: { link: existing }, error: null };
+      throw new ConflictException({
+        code: 'PERSON_ALREADY_LINKED',
+        message: 'Hồ sơ này đã gắn (hoặc đang chờ gắn) với tài khoản khác',
+      });
+    }
+    const other = await this.prisma.personAccountLink.findFirst({
+      where: { userId, status: { in: ['pending', 'approved'] }, person: { lineageId: person.lineageId } },
+    });
+    if (other)
+      throw new ConflictException({
+        code: 'ALREADY_CLAIMED',
+        message: 'Bạn đã nhận một hồ sơ khác trong họ này — hủy liên kết cũ trước',
+      });
+
+    const status = perm.canEdit ? 'approved' : 'pending';
+    const verified = status === 'approved' ? { verifiedBy: userId, verifiedAt: new Date() } : { verifiedBy: null, verifiedAt: null };
+    const link = existing
+      ? await this.prisma.personAccountLink.update({
+          where: { id: existing.id },
+          data: { userId, status, ...verified, createdAt: new Date() },
+        })
+      : await this.prisma.personAccountLink.create({ data: { personId, userId, status, ...verified } });
+    await this.audit(this.prisma, person.lineageId, userId, 'genealogy.link.request', 'family_person', personId, {
+      status,
+    });
+    if (status === 'pending') {
+      const ids = await this.verifierIds(person.lineageId, userId);
+      await this.notifications
+        .notifyMany(
+          ids.map((id) => ({
+            userId: id,
+            type: 'claim_new',
+            title: 'Có người nhận hồ sơ trong cây',
+            body: `Một thành viên cho biết họ là ${person.fullName}. Vui lòng xác nhận.`,
+            data: { lineageId: person.lineageId, personId, linkId: link.id },
+            dedupKey: `claim:${link.id}:${link.createdAt.getTime()}:${id}`,
+          })),
+        )
+        .catch(() => undefined);
+    }
+    return { data: { link }, error: null };
+  }
+
+  /** DELETE /genealogy/persons/:id/claim — người nhận tự hủy, hoặc người duyệt gỡ. */
+  async unclaimPerson(personId: string, userId: string) {
+    const person = await this.getPersonOrThrow(personId);
+    const perm = await this.effectivePerm(person.lineageId, userId);
+    const link = await this.prisma.personAccountLink.findUnique({ where: { personId } });
+    if (!link) return { data: { removed: false }, error: null };
+    if (link.userId !== userId) this.require(perm, 'canVerify', 'gỡ liên kết tài khoản');
+    await this.prisma.personAccountLink.delete({ where: { id: link.id } });
+    await this.audit(this.prisma, person.lineageId, userId, 'genealogy.link.remove', 'family_person', personId);
+    return { data: { removed: true }, error: null };
+  }
+
+  /** GET /genealogy/lineages/:lineageId/claims — hàng chờ xác nhận. */
+  async listClaims(lineageId: string, userId: string) {
+    const perm = await this.effectivePerm(lineageId, userId);
+    this.require(perm, 'canVerify', 'duyệt liên kết tài khoản');
+    const links = await this.prisma.personAccountLink.findMany({
+      where: { status: 'pending', person: { lineageId, deletedAt: null } },
+      include: {
+        user: { select: { id: true, displayName: true } },
+        person: { select: { id: true, fullName: true, dateOfBirth: true, birthYearOnly: true, generation: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+    return { data: { claims: links }, error: null };
+  }
+
+  /** POST /genealogy/claims/:id/approve|reject */
+  async reviewClaim(linkId: string, userId: string, approve: boolean) {
+    const link = await this.prisma.personAccountLink.findUnique({
+      where: { id: linkId },
+      include: { person: { select: { lineageId: true, fullName: true } } },
+    });
+    if (!link)
+      throw new NotFoundException({ code: 'CLAIM_NOT_FOUND', message: 'Không tìm thấy yêu cầu liên kết' });
+    const perm = await this.effectivePerm(link.person.lineageId, userId);
+    this.require(perm, 'canVerify', 'duyệt liên kết tài khoản');
+    if (link.status !== 'pending')
+      throw new ConflictException({ code: 'CLAIM_NOT_PENDING', message: 'Yêu cầu đã được xử lý trước đó' });
+    const status = approve ? 'approved' : 'rejected';
+    await this.prisma.personAccountLink.update({
+      where: { id: linkId },
+      data: { status, verifiedBy: userId, verifiedAt: new Date() },
+    });
+    await this.audit(this.prisma, link.person.lineageId, userId, `genealogy.link.${status}`, 'family_person', link.personId);
+    await this.notifications
+      .notify(link.userId, {
+        type: approve ? 'claim_approved' : 'claim_rejected',
+        title: approve ? 'Đã xác nhận hồ sơ của bạn' : 'Yêu cầu nhận hồ sơ chưa được xác nhận',
+        body: approve
+          ? `Tài khoản của bạn đã gắn với ${link.person.fullName} trong cây gia phả.`
+          : `Ban quản trị chưa xác nhận bạn là ${link.person.fullName}. Liên hệ Ban quản trị nếu có nhầm lẫn.`,
+        data: { lineageId: link.person.lineageId, personId: link.personId },
+        dedupKey: `claim-${status}:${linkId}:${Date.now()}`,
+      })
+      .catch(() => undefined);
+    return { data: { status }, error: null };
+  }
+
+  /** GET /genealogy/lineages/:lineageId/me — hồ sơ của chính mình trong cây (nếu đã nhận). */
+  async myPerson(lineageId: string, userId: string) {
+    await this.effectivePerm(lineageId, userId);
+    const link = await this.prisma.personAccountLink.findFirst({
+      where: { userId, status: { in: ['pending', 'approved'] }, person: { lineageId, deletedAt: null } },
+      include: { person: { select: { id: true, fullName: true } } },
+    });
+    return {
+      data: link ? { personId: link.personId, fullName: link.person.fullName, status: link.status } : null,
       error: null,
     };
   }

@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { get, patch } from "@/lib/api";
+import { del, get, patch, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 
 interface Person {
@@ -31,6 +31,9 @@ interface Person {
   bio?: string | null;
   phone?: string | null;
   email?: string | null;
+  education?: string | null;
+  hobbies?: string | null;
+  accountLink?: { status: string; mine: boolean; displayName: string } | null;
 }
 
 function fmtDate(iso?: string | null, yearOnly?: boolean): string {
@@ -83,6 +86,9 @@ export default function HoSoNguoi({
         ["Quê quán", p.hometown],
         ["Nơi ở", p.currentPlace],
         ["Nghề nghiệp", p.occupation],
+        ["Học vấn", p.education],
+        ["Sở thích", p.hobbies],
+        ["Tài khoản", p.accountLink?.status === "approved" ? `${p.accountLink.displayName}${p.accountLink.mine ? " (bạn)" : ""}` : null],
         ["Điện thoại", p.phone],
         ["Email", p.email],
       ]
@@ -127,6 +133,15 @@ export default function HoSoNguoi({
             {p.bio && (
               <p style={{ marginTop: 12, whiteSpace: "pre-line" }}>{p.bio}</p>
             )}
+            {!demo && (
+              <NhanHoSo
+                person={p}
+                onDone={(m) => {
+                  setMsg(m);
+                  setReload((x) => x + 1);
+                }}
+              />
+            )}
             {msg && <p style={{ color: "var(--brand)", marginTop: 12 }}>{msg}</p>}
             {editing && (
               <SuaHoSo
@@ -162,6 +177,13 @@ const FIELDS: { key: keyof Person; label: string; type?: "date" | "area" }[] = [
   { key: "dateOfBirth", label: "Ngày sinh", type: "date" },
   { key: "dateOfDeath", label: "Ngày mất", type: "date" },
   { key: "hometown", label: "Quê quán" },
+  { key: "currentPlace", label: "Nơi ở hiện tại" },
+  { key: "occupation", label: "Nghề nghiệp" },
+  { key: "education", label: "Học vấn" },
+  { key: "roleInLineage", label: "Vai trò trong họ (VD: Trưởng chi)" },
+  { key: "phone", label: "Điện thoại (chỉ người giữ gia phả thấy)" },
+  { key: "email", label: "Email (chỉ người giữ gia phả thấy)" },
+  { key: "hobbies", label: "Sở thích", type: "area" },
   { key: "burialPlace", label: "Phần mộ" },
   { key: "bio", label: "Tiểu sử", type: "area" },
 ];
@@ -249,6 +271,69 @@ function SuaHoSo({
           Thôi
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "Đây là tôi": gắn tài khoản đang đăng nhập với hồ sơ này. Thành viên thì
+ * chờ Người giữ gia phả xác nhận; người có quyền sửa được gắn ngay.
+ */
+function NhanHoSo({ person, onDone }: { person: Person; onDone: (msg: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const link = person.accountLink;
+
+  async function run(fn: () => Promise<{ data?: { link?: { status?: string } } } | unknown>, ok: (r: unknown) => string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fn();
+      onDone(ok(r));
+    } catch (e) {
+      setErr(apiMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (link && !link.mine) return null;
+  if (!link && person.dateOfDeath) return null;
+  return (
+    <div className="nhan-ho-so">
+      {link?.status === "pending" && <p className="sub">Bạn đã báo đây là bạn — đang chờ Ban quản trị xác nhận.</p>}
+      {link?.status === "approved" && <p className="sub">Hồ sơ này là của bạn.</p>}
+      {link ? (
+        <button
+          className="link-btn"
+          disabled={busy}
+          onClick={() =>
+            void run(
+              () => del(`/genealogy/persons/${person.id}/claim`),
+              () => "Đã hủy liên kết tài khoản với hồ sơ này.",
+            )
+          }
+        >
+          {link.status === "pending" ? "Hủy yêu cầu" : "Hủy liên kết"}
+        </button>
+      ) : (
+        <button
+          className="btn"
+          disabled={busy}
+          onClick={() =>
+            void run(
+              () => post(`/genealogy/persons/${person.id}/claim`, {}),
+              (r) =>
+                (r as { data?: { link?: { status?: string } } })?.data?.link?.status === "approved"
+                  ? "Đã gắn tài khoản của bạn với hồ sơ này."
+                  : "Đã gửi. Ban quản trị sẽ xác nhận đây là bạn.",
+            )
+          }
+        >
+          Đây là tôi
+        </button>
+      )}
+      {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
     </div>
   );
 }

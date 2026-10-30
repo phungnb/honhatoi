@@ -75,6 +75,13 @@ const FIELD_LABEL: Record<string, string> = {
   generation: "Đời",
   branch: "Chi",
   bio: "Ghi chú",
+  currentPlace: "Nơi ở hiện tại",
+  occupation: "Nghề nghiệp",
+  education: "Học vấn",
+  roleInLineage: "Vai trò trong họ",
+  hobbies: "Sở thích",
+  phone: "Điện thoại",
+  email: "Email",
 };
 
 const REL_LABEL: Record<string, string> = {

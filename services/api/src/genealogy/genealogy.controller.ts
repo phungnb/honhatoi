@@ -3,8 +3,10 @@ import {
   Body,
   Controller,
   Delete,
+  HttpCode,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -242,5 +244,39 @@ export class GenealogyController {
   @Get('persons/:id/history')
   personHistory(@Param('id') id: string, @CurrentUserId() userId: string) {
     return this.genealogy.personHistory(id, userId);
+  }
+
+  @Post('persons/:id/claim')
+  claimPerson(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.claimPerson(id, userId);
+  }
+
+  @Delete('persons/:id/claim')
+  unclaimPerson(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.unclaimPerson(id, userId);
+  }
+
+  @UseGuards(LineageGuard)
+  @Get('lineages/:lineageId/claims')
+  listClaims(@Param('lineageId', ParseUUIDPipe) lineageId: string, @CurrentUserId() userId: string) {
+    return this.genealogy.listClaims(lineageId, userId);
+  }
+
+  @UseGuards(LineageGuard)
+  @Get('lineages/:lineageId/me')
+  myPerson(@Param('lineageId', ParseUUIDPipe) lineageId: string, @CurrentUserId() userId: string) {
+    return this.genealogy.myPerson(lineageId, userId);
+  }
+
+  @Post('claims/:id/approve')
+  @HttpCode(200)
+  approveClaim(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.reviewClaim(id, userId, true);
+  }
+
+  @Post('claims/:id/reject')
+  @HttpCode(200)
+  rejectClaim(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.reviewClaim(id, userId, false);
   }
 }

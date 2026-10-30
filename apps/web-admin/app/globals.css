@@ -1156,3 +1156,42 @@ blockquote.trich-dan {
   font-weight: 700;
   line-height: 1.35;
 }
+
+/* Cảnh báo trùng người (SuaGiaPha) */
+.canh-bao-trung {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--warm-line);
+  background: var(--warm-soft);
+  border-radius: 10px;
+}
+.canh-bao-trung ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+/* "Đây là tôi" trong hồ sơ */
+.nhan-ho-so {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.list-item.lien-ket {
+  flex-wrap: wrap;
+}
+
+/* Nhật ký dòng họ */
+.nhat-ky {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.nhat-ky li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}

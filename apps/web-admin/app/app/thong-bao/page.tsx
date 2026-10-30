@@ -24,7 +24,8 @@ function linkOf(n: Item): string | null {
   if (t === "report_new" && n.data?.lineageId) return `/quan-ly/${n.data.lineageId}?tab=reports`;
   if (t.startsWith("post_")) return "/app/dong-ho";
   if (t.startsWith("event_")) return "/app/su-kien";
-  if (t.startsWith("genealogy_")) return "/app/gia-pha";
+  if (t === "claim_new" && n.data?.lineageId) return `/quan-ly/${n.data.lineageId}?tab=proposals`;
+  if (t.startsWith("genealogy_") || t.startsWith("claim_")) return "/app/gia-pha";
   return null;
 }
 
