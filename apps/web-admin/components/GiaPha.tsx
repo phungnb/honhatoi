@@ -16,6 +16,7 @@ import { roleLabel } from "@/lib/roles";
 import HoSoNguoi from "@/components/HoSoNguoi";
 import GioSapToi from "@/components/GioSapToi";
 import CayNhanh, { CayRelationship } from "@/components/CayNhanh";
+import SoDoCay from "@/components/SoDoCay";
 
 interface TreePerson {
   id: string;
@@ -45,7 +46,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
   const [persons, setPersons] = useState<TreePerson[]>([]);
   const [relationships, setRelationships] = useState<CayRelationship[]>([]);
   const [rootId, setRootId] = useState<string | null>(null);
-  const [view, setView] = useState<"cay" | "doi">("cay");
+  const [view, setView] = useState<"sodo" | "cay" | "doi">("sodo");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -205,8 +206,11 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
       )}
 
       <div className="btn-row section-gap" style={{ flexWrap: "wrap", alignItems: "center" }}>
-        <button className={`btn${view === "cay" && !q ? " primary" : ""}`} onClick={() => { setView("cay"); setSearch(""); }}>
+        <button className={`btn${view === "sodo" && !q ? " primary" : ""}`} onClick={() => { setView("sodo"); setSearch(""); }}>
           Sơ đồ cây
+        </button>
+        <button className={`btn${view === "cay" && !q ? " primary" : ""}`} onClick={() => { setView("cay"); setSearch(""); }}>
+          Theo nhánh
         </button>
         <button className={`btn${view === "doi" || q ? " primary" : ""}`} onClick={() => setView("doi")}>
           Theo đời
@@ -232,6 +236,10 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
             </>
           )}
         </p>
+      ) : view === "sodo" && !q ? (
+        <div className="section-gap">
+          <SoDoCay persons={persons} relationships={relationships} rootId={rootId} onOpen={setOpenId} />
+        </div>
       ) : view === "cay" && !q ? (
         <div className="card section-gap">
           <CayNhanh persons={persons} relationships={relationships} rootId={rootId} onOpen={setOpenId} />

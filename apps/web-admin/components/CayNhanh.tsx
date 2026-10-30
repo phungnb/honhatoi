@@ -26,11 +26,73 @@ export interface CayRelationship {
 
 const year = (iso?: string | null) => (iso ? iso.slice(0, 4) : "");
 
-function years(p: CayPerson): string {
+export function years(p: CayPerson): string {
   const b = year(p.dateOfBirth);
   const d = year(p.dateOfDeath);
   if (!b && !d) return "";
   return d ? `${b || "?"} – ${d}` : b;
+}
+
+/**
+ * Dựng cấu trúc cây từ danh sách người và quan hệ: con của mỗi người, vợ/chồng,
+ * và các gốc cần vẽ. Dùng chung cho dạng nhánh và sơ đồ.
+ */
+export function dungCay(
+  persons: CayPerson[],
+  relationships: CayRelationship[],
+  rootId?: string | null,
+) {
+  const byId = new Map(persons.map((p) => [p.id, p]));
+  const children = new Map<string, string[]>();
+  const parents = new Map<string, string[]>();
+  const spouses = new Map<string, string[]>();
+  const push = (m: Map<string, string[]>, k: string, v: string) => {
+    const a = m.get(k) ?? [];
+    if (!a.includes(v)) a.push(v);
+    m.set(k, a);
+  };
+  for (const r of relationships) {
+    if (!byId.has(r.personId) || !byId.has(r.relatedPersonId)) continue;
+    // (A, B, 'parent'): A là cha/mẹ của B. Bản ghi chiều ngược 'child' cho cùng kết quả.
+    if (r.relationshipType === "parent") {
+      push(children, r.personId, r.relatedPersonId);
+      push(parents, r.relatedPersonId, r.personId);
+    } else if (r.relationshipType === "child") {
+      push(children, r.relatedPersonId, r.personId);
+      push(parents, r.personId, r.relatedPersonId);
+    } else if (r.relationshipType === "spouse") {
+      push(spouses, r.personId, r.relatedPersonId);
+      push(spouses, r.relatedPersonId, r.personId);
+    }
+  }
+  const byBirth = (a: string, b: string) =>
+    (byId.get(a)?.dateOfBirth ?? "9999").localeCompare(byId.get(b)?.dateOfBirth ?? "9999");
+  children.forEach((a) => a.sort(byBirth));
+
+  // Người được vẽ cạnh vợ/chồng thì không làm gốc riêng; con chung chỉ vẽ dưới
+  // một người (người trong họ, tức người có cha mẹ trong cây, hoặc người đầu tiên).
+  const shownAsSpouse = new Set<string>();
+  const roots: string[] = [];
+  const hasParent = (id: string) => (parents.get(id)?.length ?? 0) > 0;
+  const candidates = persons
+    .filter((p) => !hasParent(p.id))
+    .map((p) => p.id)
+    .sort((a, b) => {
+      if (a === rootId) return -1;
+      if (b === rootId) return 1;
+      const ga = byId.get(a)?.generation ?? 99;
+      const gb = byId.get(b)?.generation ?? 99;
+      return ga - gb || byBirth(a, b);
+    });
+  for (const id of candidates) {
+    if (shownAsSpouse.has(id)) continue;
+    // Vợ/chồng có cha mẹ trong cây thì đã được vẽ ở nhánh của họ.
+    const sp = spouses.get(id) ?? [];
+    if (sp.some(hasParent)) continue;
+    roots.push(id);
+    for (const s of sp) shownAsSpouse.add(s);
+  }
+  return { byId, children, spouses, roots };
 }
 
 export default function CayNhanh({
@@ -46,59 +108,10 @@ export default function CayNhanh({
 }) {
   const [closed, setClosed] = useState<Set<string>>(new Set());
 
-  const { byId, children, spouses, roots } = useMemo(() => {
-    const byId = new Map(persons.map((p) => [p.id, p]));
-    const children = new Map<string, string[]>();
-    const parents = new Map<string, string[]>();
-    const spouses = new Map<string, string[]>();
-    const push = (m: Map<string, string[]>, k: string, v: string) => {
-      const a = m.get(k) ?? [];
-      if (!a.includes(v)) a.push(v);
-      m.set(k, a);
-    };
-    for (const r of relationships) {
-      if (!byId.has(r.personId) || !byId.has(r.relatedPersonId)) continue;
-      // (A, B, 'parent'): A là cha/mẹ của B. Bản ghi chiều ngược 'child' cho cùng kết quả.
-      if (r.relationshipType === "parent") {
-        push(children, r.personId, r.relatedPersonId);
-        push(parents, r.relatedPersonId, r.personId);
-      } else if (r.relationshipType === "child") {
-        push(children, r.relatedPersonId, r.personId);
-        push(parents, r.personId, r.relatedPersonId);
-      } else if (r.relationshipType === "spouse") {
-        push(spouses, r.personId, r.relatedPersonId);
-        push(spouses, r.relatedPersonId, r.personId);
-      }
-    }
-    const byBirth = (a: string, b: string) =>
-      (byId.get(a)?.dateOfBirth ?? "9999").localeCompare(byId.get(b)?.dateOfBirth ?? "9999");
-    children.forEach((a) => a.sort(byBirth));
-
-    // Người được vẽ cạnh vợ/chồng thì không làm gốc riêng; con chung chỉ vẽ dưới
-    // một người (người trong họ, tức người có cha mẹ trong cây, hoặc người đầu tiên).
-    const shownAsSpouse = new Set<string>();
-    const roots: string[] = [];
-    const hasParent = (id: string) => (parents.get(id)?.length ?? 0) > 0;
-    const candidates = persons
-      .filter((p) => !hasParent(p.id))
-      .map((p) => p.id)
-      .sort((a, b) => {
-        if (a === rootId) return -1;
-        if (b === rootId) return 1;
-        const ga = byId.get(a)?.generation ?? 99;
-        const gb = byId.get(b)?.generation ?? 99;
-        return ga - gb || byBirth(a, b);
-      });
-    for (const id of candidates) {
-      if (shownAsSpouse.has(id)) continue;
-      // Vợ/chồng có cha mẹ trong cây thì đã được vẽ ở nhánh của họ.
-      const sp = spouses.get(id) ?? [];
-      if (sp.some(hasParent)) continue;
-      roots.push(id);
-      for (const s of sp) shownAsSpouse.add(s);
-    }
-    return { byId, children, spouses, roots };
-  }, [persons, relationships, rootId]);
+  const { byId, children, spouses, roots } = useMemo(
+    () => dungCay(persons, relationships, rootId),
+    [persons, relationships, rootId],
+  );
 
   const drawn = new Set<string>();
 

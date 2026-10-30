@@ -263,7 +263,7 @@ export default function DuyetXacMinh({
       )}
       {error && error !== "unauthorized" && (
         <div className="card section-gap">
-          <span style={{ color: "#ff6b6b" }}>{error}</span>
+          <span style={{ color: "var(--danger)" }}>{error}</span>
         </div>
       )}
 
