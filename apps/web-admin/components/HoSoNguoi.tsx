@@ -4,10 +4,13 @@
  * Hồ sơ một người trong cây — bảng trượt từ dưới lên trên điện thoại,
  * hộp giữa màn hình trên máy tính. Số điện thoại/email chỉ hiện với người
  * có quyền sửa gia phả (backend đã ẩn sẵn).
+ *
+ * Nút "Sửa / đề xuất sửa": người có quyền sửa thì lưu ngay; Thành viên thì
+ * API tạo đề xuất chờ Ban quản trị duyệt (PATCH /genealogy/persons/:id).
  */
 
 import { useEffect, useState } from "react";
-import { get } from "@/lib/api";
+import { get, patch } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 
 interface Person {
@@ -47,6 +50,9 @@ export default function HoSoNguoi({
 }) {
   const [p, setP] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setP(null);
@@ -56,7 +62,7 @@ export default function HoSoNguoi({
     )
       .then((b) => setP(b?.data?.person ?? null))
       .catch((e) => setError(apiMessage(e)));
-  }, [personId, demo]);
+  }, [personId, demo, reload]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -121,13 +127,127 @@ export default function HoSoNguoi({
             {p.bio && (
               <p style={{ marginTop: 12, whiteSpace: "pre-line" }}>{p.bio}</p>
             )}
+            {msg && <p style={{ color: "var(--brand)", marginTop: 12 }}>{msg}</p>}
+            {editing && (
+              <SuaHoSo
+                person={p}
+                onCancel={() => setEditing(false)}
+                onDone={(m) => {
+                  setEditing(false);
+                  setMsg(m);
+                  setReload((x) => x + 1);
+                }}
+              />
+            )}
           </>
         )}
         <div className="btn-row" style={{ marginTop: 16 }}>
+          {p && !demo && !editing && (
+            <button className="btn" onClick={() => { setMsg(null); setEditing(true); }}>
+              Sửa / đề xuất sửa
+            </button>
+          )}
           <button className="btn" onClick={onClose}>
             Đóng
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const FIELDS: { key: keyof Person; label: string; type?: "date" | "area" }[] = [
+  { key: "fullName", label: "Họ tên" },
+  { key: "nickname", label: "Tên thường gọi" },
+  { key: "dateOfBirth", label: "Ngày sinh", type: "date" },
+  { key: "dateOfDeath", label: "Ngày mất", type: "date" },
+  { key: "hometown", label: "Quê quán" },
+  { key: "burialPlace", label: "Phần mộ" },
+  { key: "bio", label: "Tiểu sử", type: "area" },
+];
+
+function SuaHoSo({
+  person,
+  onCancel,
+  onDone,
+}: {
+  person: Person;
+  onCancel: () => void;
+  onDone: (msg: string) => void;
+}) {
+  const initial = (k: keyof Person, type?: string) => {
+    const v = person[k];
+    if (typeof v !== "string") return "";
+    return type === "date" ? v.slice(0, 10) : v;
+  };
+  const [form, setForm] = useState<Record<string, string>>(() =>
+    Object.fromEntries(FIELDS.map((f) => [f.key, initial(f.key, f.type)])),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    // Chỉ gửi trường đã đổi; ngày gửi dạng ISO.
+    const changed: Record<string, string> = {};
+    for (const f of FIELDS) {
+      const v = form[f.key].trim();
+      if (v === initial(f.key, f.type)) continue;
+      if (!v) continue;
+      changed[f.key] = f.type === "date" ? new Date(v + "T00:00:00Z").toISOString() : v;
+    }
+    if (Object.keys(changed).length === 0) {
+      setError("Bạn chưa thay đổi gì.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const b = await patch<{ data?: { change_request?: unknown } }>(
+        `/genealogy/persons/${person.id}`,
+        changed,
+      );
+      onDone(
+        b?.data?.change_request
+          ? "Đã gửi đề xuất. Ban quản trị dòng họ sẽ duyệt trước khi cập nhật."
+          : "Đã lưu thay đổi.",
+      );
+    } catch (e) {
+      setError(apiMessage(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <h3 className="card-title">Sửa thông tin</h3>
+      {FIELDS.map((f) => (
+        <label key={f.key} className="muted-text" style={{ display: "block", marginTop: 8 }}>
+          {f.label}
+          {f.type === "area" ? (
+            <textarea
+              className="field"
+              rows={3}
+              value={form[f.key]}
+              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+            />
+          ) : (
+            <input
+              className="field"
+              type={f.type === "date" ? "date" : "text"}
+              value={form[f.key]}
+              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+            />
+          )}
+        </label>
+      ))}
+      {error && <p style={{ color: "var(--danger)", marginTop: 8 }}>{error}</p>}
+      <div className="btn-row" style={{ marginTop: 12 }}>
+        <button className="btn primary" disabled={busy} onClick={() => void submit()}>
+          {busy ? "Đang gửi…" : "Gửi"}
+        </button>
+        <button className="btn" onClick={onCancel}>
+          Thôi
+        </button>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -18,6 +19,7 @@ import {
   EmailRegisterDto,
   GoogleLoginDto,
   SetPasswordDto,
+  UpdateMeDto,
 } from './dto/email-auth.dto';
 import {
   ConfirmPhoneChangeDto,
@@ -68,6 +70,12 @@ export class AuthController {
   @HttpCode(200)
   consent(@CurrentUserId() userId: string, @Body() dto: ConsentDto) {
     return this.auth.recordConsent(userId, dto);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  updateMe(@CurrentUserId() userId: string, @Body() dto: UpdateMeDto) {
+    return this.auth.updateMe(userId, dto);
   }
 
   @Delete('me')

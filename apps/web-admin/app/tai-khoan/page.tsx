@@ -14,6 +14,7 @@ import { clearTokens, get, getAccessToken, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 import MatKhauEmail from "@/components/MatKhauEmail";
 import XoaTaiKhoan from "@/components/XoaTaiKhoan";
+import DoiTen from "@/components/DoiTen";
 
 const inputStyle: CSSProperties = {
   display: "block",
@@ -142,7 +143,9 @@ export default function TaiKhoanPage() {
         </p>
       </div>
 
-      <div className="card" style={{ maxWidth: 440 }}>
+      <DoiTen />
+
+      <div className="card section-gap" style={{ maxWidth: 440 }}>
         <h2 className="card-title">Đổi số điện thoại</h2>
         {done && (
           <p style={{ color: "var(--brand)" }}>
