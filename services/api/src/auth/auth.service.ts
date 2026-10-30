@@ -17,6 +17,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import {
   EmailLoginDto,
   EmailRegisterDto,
+  ConsentDto,
   GoogleLoginDto,
   SetPasswordDto,
 } from './dto/email-auth.dto';
@@ -391,6 +392,20 @@ export class AuthService {
       }),
     ]);
     return { data: { deleted: true }, error: null };
+  }
+
+  /**
+   * POST /auth/consent — người dùng tích ô đồng ý Điều khoản + Chính sách quyền
+   * riêng tư. Lưu thời điểm và phiên bản để kiểm chứng được (Luật BVDLCN 2025
+   * Điều 9); chính sách đổi phiên bản thì app hỏi lại.
+   */
+  async recordConsent(userId: string, dto: ConsentDto) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { privacyConsentAt: new Date(), privacyConsentVersion: dto.version },
+      select: { privacyConsentAt: true, privacyConsentVersion: true },
+    });
+    return { data: user, error: null };
   }
 
   /** GET /auth/me — hồ sơ rút gọn của user hiện tại. */
