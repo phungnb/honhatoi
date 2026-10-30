@@ -59,7 +59,7 @@ export default function Sidebar() {
         { href: "/app", label: "Trang chủ", short: "Trang chủ", mobile: true },
         { href: "/app/gia-pha", label: "Gia phả", short: "Gia phả", mobile: true },
         { href: "/app/tin-nhan", label: "Tin nhắn", short: "Tin nhắn", mobile: true },
-        { href: "/app/su-kien", label: "Sự kiện", short: "Sự kiện", mobile: true },
+        { href: "/app/dong-ho", label: "Dòng họ", short: "Dòng họ", mobile: true },
         {
           href: "/app/thong-bao",
           label: unread > 0 ? `Thông báo (${unread})` : "Thông báo",
@@ -80,7 +80,12 @@ export default function Sidebar() {
         { href: "/dang-nhap", label: "Đăng nhập", short: "Đăng nhập", mobile: true },
       ];
   const isActive = (href: string) =>
-    href === "/app" ? pathname === "/app" : pathname === href || pathname.startsWith(href + "/");
+    href === "/app"
+      ? pathname === "/app"
+      : pathname === href ||
+        pathname.startsWith(href + "/") ||
+        // Sự kiện là một mục trong tab Dòng họ.
+        (href === "/app/dong-ho" && pathname.startsWith("/app/su-kien"));
 
   return (
     <>

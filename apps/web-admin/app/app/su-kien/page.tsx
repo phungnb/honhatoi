@@ -11,6 +11,7 @@ import Link from "next/link";
 import { get, getAccessToken, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 import { useLineages } from "@/lib/lineage";
+import DongHoTabs from "@/components/DongHoTabs";
 
 interface EventItem {
   id: string;
@@ -147,9 +148,10 @@ export default function SuKienPage() {
   return (
     <>
       <div className="page-head">
-        <h1 className="page-title">Sự kiện</h1>
+        <h1 className="page-title">Dòng họ</h1>
         <p className="page-desc">{current?.name}: giỗ tổ, họp họ, gặp mặt, mừng thọ.</p>
       </div>
+      <DongHoTabs active="su-kien" />
       {msg && <p style={{ color: "var(--brand)" }}>{msg}</p>}
       {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
 
