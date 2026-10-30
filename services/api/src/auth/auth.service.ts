@@ -19,6 +19,7 @@ import {
   EmailRegisterDto,
   ConsentDto,
   GoogleLoginDto,
+  UpdateMeDto,
   SetPasswordDto,
 } from './dto/email-auth.dto';
 import {
@@ -406,6 +407,15 @@ export class AuthService {
       select: { privacyConsentAt: true, privacyConsentVersion: true },
     });
     return { data: user, error: null };
+  }
+
+  /** PATCH /auth/me — đổi tên hiển thị. */
+  async updateMe(userId: string, dto: UpdateMeDto) {
+    const displayName = dto.displayName.trim();
+    if (!displayName)
+      throw new BadRequestException({ code: 'INVALID_NAME', message: 'Tên không được để trống' });
+    await this.prisma.user.update({ where: { id: userId }, data: { displayName } });
+    return this.me(userId);
   }
 
   /** GET /auth/me — hồ sơ rút gọn của user hiện tại. */

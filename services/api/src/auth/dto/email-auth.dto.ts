@@ -87,3 +87,11 @@ export class ConsentDto {
   @MaxLength(20)
   version: string;
 }
+
+/** Đổi tên hiển thị của tài khoản đang đăng nhập. */
+export class UpdateMeDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  displayName: string;
+}
