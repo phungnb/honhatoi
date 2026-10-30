@@ -120,6 +120,20 @@ export default function TinNhanPage() {
     }
   }
 
+  // Mở thẳng cuộc trò chuyện riêng từ danh bạ: /app/tin-nhan?voi=<userId>.
+  const voiDone = useRef(false);
+  useEffect(() => {
+    if (voiDone.current || !members.length) return;
+    const voi = new URLSearchParams(window.location.search).get("voi");
+    if (!voi) return;
+    voiDone.current = true;
+    window.history.replaceState(null, "", "/app/tin-nhan");
+    const m = members.find((x) => x.userId === voi);
+    if (m) void openDirect(m);
+    // openDirect không đổi theo lần vẽ; chỉ chạy khi danh sách thành viên về.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members]);
+
   if (error === "unauthorized")
     return (
       <Link className="btn primary" href="/dang-nhap">

@@ -938,3 +938,63 @@ tbody tr:hover {
   min-height: 26px;
   font-size: 0.8125rem;
 }
+
+/* ===== Tab Dòng họ: bảng tin, danh bạ ===== */
+.dong-ho-tabs {
+  flex-wrap: wrap;
+}
+.btn.chip {
+  min-height: 40px;
+  padding: 6px 14px;
+  font-size: 0.875rem;
+}
+.bai-viet.ghim {
+  border-color: var(--brand-line);
+}
+.bai-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.875rem;
+}
+.bai-noi-dung {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.binh-luan {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.binh-luan-item {
+  padding: 8px 0;
+  font-size: 0.9375rem;
+}
+.binh-luan-item p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.list-item.thanh-vien {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bai-tieu-de {
+  margin-top: 8px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
