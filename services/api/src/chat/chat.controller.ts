@@ -17,6 +17,7 @@ import { UpdateMessageDto } from './dto/update-message.dto';
 import { ToggleReactionDto } from './dto/toggle-reaction.dto';
 import { MarkReadDto } from './dto/mark-read.dto';
 import { AddMembersDto } from './dto/add-members.dto';
+import { BlockUserDto, PinMessageDto } from './dto/pin-block.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
 
@@ -59,9 +60,11 @@ export class ChatController {
     @CurrentUserId() userId: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
+    @Query('q') q?: string,
   ) {
     return this.chat.getMessages(userId, id, {
       cursor,
+      q,
       limit: limit ? Number(limit) || 30 : undefined,
     });
   }
@@ -134,5 +137,32 @@ export class ChatController {
     @CurrentUserId() userId: string,
   ) {
     return this.chat.leaveConversation(userId, id);
+  }
+
+  @Post('messages/:id/pin')
+  pinMessage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: PinMessageDto,
+  ) {
+    return this.chat.pinMessage(userId, id, dto.pinned);
+  }
+
+  @Get('blocks')
+  listBlocks(@CurrentUserId() userId: string) {
+    return this.chat.listBlocks(userId);
+  }
+
+  @Post('blocks')
+  block(@CurrentUserId() userId: string, @Body() dto: BlockUserDto) {
+    return this.chat.block(userId, dto.userId, dto.reason);
+  }
+
+  @Delete('blocks/:userId')
+  unblock(
+    @Param('userId', ParseUUIDPipe) targetId: string,
+    @CurrentUserId() userId: string,
+  ) {
+    return this.chat.unblock(userId, targetId);
   }
 }

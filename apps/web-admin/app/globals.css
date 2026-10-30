@@ -624,20 +624,178 @@ tbody tr:hover {
   border-radius: 14px 14px 4px 14px;
 }
 
-.chat-input {
+.chat-input-wrap {
   position: sticky;
   bottom: 0;
-  display: flex;
-  gap: 8px;
-  align-items: center;
   background: var(--bg);
   padding: 10px 0;
 }
 
+.chat-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+}
+
 @media (max-width: 900px) {
-  .chat-input {
+  .chat-input-wrap {
     bottom: calc(64px + env(safe-area-inset-bottom));
   }
+}
+
+.chat-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.chat-head .grow {
+  flex: 1;
+  min-width: 0;
+}
+.chat-title {
+  font-size: 1.25rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.msg-row.mine {
+  align-items: flex-end;
+}
+.bubble {
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+.bubble.selected {
+  box-shadow: 0 0 0 2px var(--brand-line);
+}
+.bubble.flash {
+  box-shadow: 0 0 0 3px var(--brand);
+}
+.trich-dan {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--bg);
+  border: 0;
+  border-left: 3px solid var(--brand);
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin: 4px 0 6px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.trich-dan strong,
+.trich-dan span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+blockquote.trich-dan {
+  white-space: pre-wrap;
+}
+.msg-reactions,
+.msg-emoji {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.msg-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+}
+.ghim-bar {
+  background: var(--surface);
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+.ghim-bar-main,
+.link-plain {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+.link-plain {
+  display: block;
+}
+.ghim-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-context {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-left: 3px solid var(--brand);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+.chat-context .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Tạo nhóm gia đình */
+.chon-nguoi {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+.chon-nguoi-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-height: 44px;
+}
+
+/* Báo cáo vi phạm */
+.bao-cao {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+.bao-cao-item blockquote {
+  margin: 8px 0;
 }
 
 /* Sơ đồ cây dạng nhánh (components/CayNhanh.tsx) */

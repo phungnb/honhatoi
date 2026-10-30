@@ -14,6 +14,7 @@ import { apiMessage } from "@/lib/errors";
 import { useLineages } from "@/lib/lineage";
 import { isLineageAdmin } from "@/lib/roles";
 import DongHoTabs from "@/components/DongHoTabs";
+import BaoCao from "@/components/BaoCao";
 
 interface PostItem {
   id: string;
@@ -34,6 +35,7 @@ interface CommentItem {
   content: string;
   createdAt: string;
   author: { name: string };
+  isMine?: boolean;
   canDelete: boolean;
 }
 
@@ -334,6 +336,11 @@ function BaiViet({
           </button>
         )}
       </div>
+      {!p.isMine && (
+        <div style={{ marginTop: 8 }}>
+          <BaoCao targetType="post" targetId={p.id} label="Báo cáo bài này" />
+        </div>
+      )}
       {err && <p style={{ color: "var(--danger)", marginTop: 8 }}>{err}</p>}
       {showComments && (
         <BinhLuan
@@ -407,6 +414,7 @@ function BinhLuan({ base, onCount }: { base: string; onCount: (n: number) => voi
                 Xóa
               </button>
             )}
+            {!c.isMine && <BaoCao targetType="comment" targetId={c.id} />}
           </div>
         ))
       )}
