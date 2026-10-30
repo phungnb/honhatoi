@@ -15,6 +15,7 @@ import { apiMessage } from "@/lib/errors";
 import MatKhauEmail from "@/components/MatKhauEmail";
 import XoaTaiKhoan from "@/components/XoaTaiKhoan";
 import DoiTen from "@/components/DoiTen";
+import CoChu from "@/components/CoChu";
 
 const inputStyle: CSSProperties = {
   display: "block",
@@ -143,6 +144,8 @@ export default function TaiKhoanPage() {
         </p>
       </div>
 
+      <CoChu />
+
       <DoiTen />
 
       <div className="card section-gap" style={{ maxWidth: 440 }}>
@@ -152,7 +155,7 @@ export default function TaiKhoanPage() {
             Đã đổi sang số {done}. Các thiết bị khác đã bị đăng xuất.
           </p>
         )}
-        {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+        {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
         {step === 1 ? (
           <>
             <label className="muted-text">

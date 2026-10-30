@@ -88,7 +88,7 @@ export default function SuperAdminPage() {
 
       {error && error !== "unauthorized" && error !== "forbidden" && (
         <div className="card">
-          <span style={{ color: "#ff6b6b" }}>{error}</span>
+          <span style={{ color: "var(--danger)" }}>{error}</span>
         </div>
       )}
 

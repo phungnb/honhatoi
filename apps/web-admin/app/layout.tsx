@@ -22,7 +22,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
+      <head>
+        {/* Áp cỡ chữ đã chọn trước khi vẽ trang để không bị nháy cỡ chữ. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var c=localStorage.getItem("hnt_co_chu");if(c)document.documentElement.dataset.coChu=c}catch(e){}`,
+          }}
+        />
+      </head>
       <body>
         <div className="shell">
           <Sidebar />
