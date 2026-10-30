@@ -44,4 +44,38 @@ export class CreatePersonDto {
   @IsOptional()
   @IsString()
   bio?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  currentPlace?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  occupation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  education?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  roleInLineage?: string;
+
+  @IsOptional()
+  @IsString()
+  hobbies?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  email?: string;
 }

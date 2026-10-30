@@ -13,15 +13,18 @@ import Link from "next/link";
 import { del, get, patch, post } from "@/lib/api";
 import {
   MyLineage,
+  canManageLineage,
   isLineageAdmin,
   roleLabel,
   type LineageRole,
 } from "@/lib/roles";
 import DuyetXacMinh from "@/components/DuyetXacMinh";
 import BaoCaoViPham from "@/components/BaoCaoViPham";
+import XacNhanLienKet from "@/components/XacNhanLienKet";
+import NhatKy from "@/components/NhatKy";
 import SuaGiaPha from "@/components/SuaGiaPha";
 
-type Tab = "tree" | "proposals" | "requests" | "members" | "invites" | "reports";
+type Tab = "tree" | "proposals" | "requests" | "members" | "invites" | "reports" | "log";
 
 interface JoinRequest {
   id: string;
@@ -80,7 +83,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
   // Mở thẳng một tab từ link, VD /quan-ly/:id?tab=invites (từ Trang chủ).
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "invites" || t === "members" || t === "requests" || t === "proposals" || t === "reports") setTab(t);
+    if (t === "invites" || t === "members" || t === "requests" || t === "proposals" || t === "reports" || t === "log") setTab(t);
   }, []);
   const [state, setState] = useState<"loading" | "ready" | "unauthorized" | "forbidden">("loading");
 
@@ -129,6 +132,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
     { key: "members", label: "Thành viên & vai trò", show: true },
     { key: "invites", label: "Mã mời", show: admin },
     { key: "reports", label: "Báo cáo vi phạm", show: admin },
+    { key: "log", label: "Nhật ký", show: admin },
   ];
 
   return (
@@ -159,7 +163,12 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
 
       <div className="section-gap">
         {tab === "tree" && <SuaGiaPha lineageId={lineageId} />}
-        {tab === "proposals" && <DuyetXacMinh lockedLineageId={lineageId} embedded />}
+        {tab === "proposals" && (
+          <>
+            {canManageLineage(me) && <XacNhanLienKet lineageId={lineageId} />}
+            <DuyetXacMinh lockedLineageId={lineageId} embedded />
+          </>
+        )}
         {tab === "requests" && admin && (
           <JoinRequests lineageId={lineageId} isOwner={me.isOwner === true} />
         )}
@@ -168,6 +177,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
         )}
         {tab === "invites" && admin && <Invites lineageId={lineageId} />}
         {tab === "reports" && admin && <BaoCaoViPham lineageId={lineageId} />}
+        {tab === "log" && admin && <NhatKy lineageId={lineageId} />}
       </div>
     </>
   );

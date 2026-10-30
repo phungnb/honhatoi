@@ -7,7 +7,7 @@
  * vẫn kiểm tra quyền; người không đủ quyền sẽ thành đề xuất chờ duyệt.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { del, get, patch, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
@@ -45,6 +45,16 @@ const RELATION_LABEL: Record<Relation, string> = {
 
 const year = (iso?: string | null) => (iso ? iso.slice(0, 4) : "");
 
+/** Chuẩn hoá tên để so trùng: bỏ dấu, gộp khoảng trắng, chữ thường. */
+const foldName = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
 const EMPTY = {
   fullName: "",
   gender: "male",
@@ -60,6 +70,7 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
   const [persons, setPersons] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(EMPTY);
+  const [dupOk, setDupOk] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,8 +94,25 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     void load();
   }, [load]);
 
-  const set = (k: keyof typeof EMPTY) => (v: string) =>
+  const set = (k: keyof typeof EMPTY) => (v: string) => {
+    if (k === "fullName" || k === "birthYear") setDupOk(false);
     setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  // Cảnh báo trùng: cùng tên (không phân biệt dấu) và năm sinh lệch ≤ 2
+  // (hoặc một bên chưa có năm sinh). Không chặn hẳn vì trong họ có thể
+  // trùng tên thật.
+  const dups = useMemo(() => {
+    const name = foldName(form.fullName);
+    if (name.length < 3) return [];
+    const y = Number(form.birthYear.trim()) || null;
+    return persons.filter((p) => {
+      if (editing && p.id === editing.id) return false;
+      if (foldName(p.fullName) !== name) return false;
+      const py = Number(year(p.dateOfBirth)) || null;
+      return !y || !py || Math.abs(py - y) <= 2;
+    });
+  }, [form.fullName, form.birthYear, persons, editing]);
 
   function personBody() {
     const y = form.birthYear.trim();
@@ -104,6 +132,8 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
       return setError("Năm sinh gồm 4 số, VD 1958.");
     if (!editing && persons.length > 0 && !form.relatedId)
       return setError("Chọn người có quan hệ với người mới.");
+    if (dups.length > 0 && !dupOk)
+      return setError("Có thể trùng người đã có trong cây — kiểm tra rồi đánh dấu “Đây là người khác”.");
     setBusy(true);
     setError(null);
     setMsg(null);
@@ -259,6 +289,25 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
             placeholder="VD: Nguyễn Văn An"
           />
         </label>
+        {dups.length > 0 && (
+          <div className="canh-bao-trung" role="alert">
+            <strong>Có thể đã có người này trong cây:</strong>
+            <ul>
+              {dups.map((p) => (
+                <li key={p.id}>
+                  {p.fullName}
+                  {year(p.dateOfBirth) ? ` (sinh ${year(p.dateOfBirth)})` : ""}
+                  {p.generation ? ` · đời ${p.generation}` : ""}
+                  {p.branch ? ` · ${p.branch}` : ""}
+                </li>
+              ))}
+            </ul>
+            <label>
+              <input type="checkbox" checked={dupOk} onChange={(e) => setDupOk(e.target.checked)} /> Đây là
+              người khác, vẫn lưu
+            </label>
+          </div>
+        )}
         <div className="btn-row" style={{ flexWrap: "wrap", marginTop: 12 }}>
           <label className="muted-text" style={{ flex: "1 1 120px" }}>
             Giới tính
