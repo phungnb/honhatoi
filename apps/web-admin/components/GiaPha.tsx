@@ -12,7 +12,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
 import { useLineages } from "@/lib/lineage";
-import { roleLabel } from "@/lib/roles";
+import { canManageLineage, roleLabel } from "@/lib/roles";
+import BieuTuong from "@/components/BieuTuong";
 import HoSoNguoi from "@/components/HoSoNguoi";
 import GioSapToi from "@/components/GioSapToi";
 import CayNhanh, { CayRelationship } from "@/components/CayNhanh";
@@ -157,7 +158,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
 
   return (
     <>
-      <div className="page-head">
+      <div className={`page-head${demo ? "" : " gon"}`}>
         <h1 className="page-title">{demo ? "Dòng họ mẫu" : "Gia phả"}</h1>
         <p className="page-desc">
           {lineage?.name ?? ""}
@@ -205,24 +206,26 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
         </p>
       )}
 
-      <div className="btn-row section-gap" style={{ flexWrap: "wrap", alignItems: "center" }}>
-        <button className={`btn${view === "sodo" && !q ? " primary" : ""}`} onClick={() => { setView("sodo"); setSearch(""); }}>
+      <div className="chips" role="tablist" aria-label="Cách xem cây">
+        <button role="tab" aria-selected={view === "sodo" && !q} className={`chip${view === "sodo" && !q ? " on" : ""}`} onClick={() => { setView("sodo"); setSearch(""); }}>
           Sơ đồ cây
         </button>
-        <button className={`btn${view === "cay" && !q ? " primary" : ""}`} onClick={() => { setView("cay"); setSearch(""); }}>
+        <button role="tab" aria-selected={view === "cay" && !q} className={`chip${view === "cay" && !q ? " on" : ""}`} onClick={() => { setView("cay"); setSearch(""); }}>
           Theo nhánh
         </button>
-        <button className={`btn${view === "doi" || q ? " primary" : ""}`} onClick={() => setView("doi")}>
+        <button role="tab" aria-selected={view === "doi" || !!q} className={`chip${view === "doi" || q ? " on" : ""}`} onClick={() => setView("doi")}>
           Theo đời
         </button>
+      </div>
+      <label className="searchbar" style={{ marginBottom: 12 }}>
+        <BieuTuong ten="tim" size={18} />
         <input
-          className="field"
-          style={{ flex: "1 1 200px", minWidth: 0, maxWidth: 360, marginTop: 0 }}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Tìm tên trong họ…"
+          aria-label="Tìm tên trong họ"
         />
-      </div>
+      </label>
 
       {loading ? (
         <p className="muted-text section-gap">Đang tải…</p>
@@ -277,6 +280,10 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
             </div>
           </section>
         ))
+      )}
+
+      {!demo && member.current && canManageLineage(member.current) && (
+        <ChoXacMinh lineageId={member.current.id} />
       )}
 
       {demo && persons.length > 0 && <GioSapToi demo />}
@@ -336,5 +343,42 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
 
       {openId && <HoSoNguoi personId={openId} demo={demo} onClose={() => setOpenId(null)} />}
     </>
+  );
+}
+
+/** Thẻ "Đề xuất đang chờ xác minh" dưới cây (người có quyền duyệt), ẩn khi không có gì chờ. */
+function ChoXacMinh({ lineageId }: { lineageId: string }) {
+  const [counts, setCounts] = useState<{ proposals: number; claims: number } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([
+      get<{ data?: { proposals?: { requestType?: string }[] } }>(`/genealogy/lineages/${lineageId}/proposals`).catch(
+        () => null,
+      ),
+      get<{ data?: { claims?: unknown[] } }>(`/genealogy/lineages/${lineageId}/claims`).catch(() => null),
+    ]).then(([p, c]) => {
+      if (alive) setCounts({ proposals: p?.data?.proposals?.length ?? 0, claims: c?.data?.claims?.length ?? 0 });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [lineageId]);
+
+  if (!counts || counts.proposals + counts.claims === 0) return null;
+  const parts = [
+    counts.proposals ? `${counts.proposals} đề xuất sửa gia phả` : "",
+    counts.claims ? `${counts.claims} người nhận hồ sơ` : "",
+  ].filter(Boolean);
+  return (
+    <div className="card pending-card">
+      <div className="grow">
+        <strong style={{ display: "block" }}>Đề xuất đang chờ xác minh</strong>
+        <span className="sub">{parts.join(" · ")}</span>
+      </div>
+      <Link className="ghost-btn" href={`/quan-ly/${lineageId}?tab=proposals`}>
+        Xem
+      </Link>
+    </div>
   );
 }

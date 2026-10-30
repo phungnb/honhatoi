@@ -7,6 +7,7 @@ import { get, getAccessToken } from "@/lib/api";
 import { MyLineage, canManageLineage } from "@/lib/roles";
 import { SITE } from "@/lib/site";
 import HoiDongY from "@/components/HoiDongY";
+import BieuTuong from "@/components/BieuTuong";
 
 /**
  * Điều hướng chung cho mọi luồng (con cháu, quản lý, nền tảng): sidebar
@@ -53,13 +54,13 @@ export default function Sidebar() {
     return () => window.removeEventListener("hnt:notifications", loadUnread);
   }, [loadUnread]);
 
-  type Item = { href: string; label: string; short: string; mobile: boolean };
+  type Item = { href: string; label: string; short: string; mobile: boolean; icon?: string };
   const items: Item[] = loggedIn
     ? [
-        { href: "/app", label: "Trang chủ", short: "Trang chủ", mobile: true },
-        { href: "/app/gia-pha", label: "Gia phả", short: "Gia phả", mobile: true },
-        { href: "/app/tin-nhan", label: "Tin nhắn", short: "Tin nhắn", mobile: true },
-        { href: "/app/dong-ho", label: "Dòng họ", short: "Dòng họ", mobile: true },
+        { href: "/app", label: "Trang chủ", short: "Trang chủ", mobile: true, icon: "trang-chu" },
+        { href: "/app/gia-pha", label: "Gia phả", short: "Gia phả", mobile: true, icon: "gia-pha" },
+        { href: "/app/tin-nhan", label: "Tin nhắn", short: "Tin nhắn", mobile: true, icon: "tin-nhan" },
+        { href: "/app/dong-ho", label: "Dòng họ", short: "Dòng họ", mobile: true, icon: "dong-ho" },
         {
           href: "/app/thong-bao",
           label: unread > 0 ? `Thông báo (${unread})` : "Thông báo",
@@ -72,12 +73,12 @@ export default function Sidebar() {
         ...(platformAdmin
           ? [{ href: "/super-admin", label: "Quản trị nền tảng", short: "Nền tảng", mobile: false }]
           : []),
-        { href: "/tai-khoan", label: "Cá nhân", short: "Cá nhân", mobile: true },
+        { href: "/tai-khoan", label: "Cá nhân", short: "Cá nhân", mobile: true, icon: "ca-nhan" },
       ]
     : [
-        { href: "/app", label: "Giới thiệu", short: "Giới thiệu", mobile: true },
-        { href: "/mau", label: "Dòng họ mẫu", short: "Họ mẫu", mobile: true },
-        { href: "/dang-nhap", label: "Đăng nhập", short: "Đăng nhập", mobile: true },
+        { href: "/app", label: "Giới thiệu", short: "Giới thiệu", mobile: true, icon: "trang-chu" },
+        { href: "/mau", label: "Dòng họ mẫu", short: "Họ mẫu", mobile: true, icon: "gia-pha" },
+        { href: "/dang-nhap", label: "Đăng nhập", short: "Đăng nhập", mobile: true, icon: "dang-nhap" },
       ];
   const isActive = (href: string) =>
     href === "/app"
@@ -94,14 +95,14 @@ export default function Sidebar() {
           <div className="brand-mark" style={{ width: 32, height: 32, fontSize: 16 }}>
             H
           </div>
-          <div className="brand-name" style={{ fontSize: 15 }}>
-            HỌ NHÀ TÔI
+          <div className="brand-name" style={{ fontSize: 17 }}>
+            HỌ NHÀ <span style={{ color: "var(--brand)" }}>TÔI</span>
           </div>
         </Link>
         {loggedIn && (
-          <Link href="/app/thong-bao" className="bell" aria-label="Thông báo">
-            Thông báo
-            {unread > 0 && <span className="bell-count">{unread > 99 ? "99+" : unread}</span>}
+          <Link href="/app/thong-bao" className="iconbtn" aria-label={unread > 0 ? `Thông báo, ${unread} chưa đọc` : "Thông báo"}>
+            <BieuTuong ten="chuong" size={20} />
+            {unread > 0 && <span className="bell-count iconbtn-count">{unread > 99 ? "99+" : unread}</span>}
           </Link>
         )}
       </header>
@@ -155,9 +156,11 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={isActive(item.href) ? "active" : ""}
+              aria-current={isActive(item.href) ? "page" : undefined}
             >
-              <span className="nav-dot" />
+              <BieuTuong ten={item.icon ?? "trang-chu"} />
               {item.short}
+              <span className="tdot" />
             </Link>
           ))}
       </nav>
