@@ -15,6 +15,7 @@ import { apiMessage } from "@/lib/errors";
 import { useLineages } from "@/lib/lineage";
 import { isLineageAdmin } from "@/lib/roles";
 import BaoCao from "@/components/BaoCao";
+import BieuTuong from "@/components/BieuTuong";
 
 interface Reaction {
   emoji: string;
@@ -231,11 +232,46 @@ export default function TinNhanPage() {
     );
   }
 
+  const f = fold(filter.trim());
+  const match = (c: Conversation) => !f || fold(titleOf(c, me)).includes(f);
+  const list = (convs ?? []).filter(match);
+  const groupRooms = list.filter((c) => kind(c) === "lineage_group");
+  const familyRooms = list.filter((c) => kind(c) === "family_group");
+  const directs = list.filter((c) => kind(c) === "direct");
+  const hasCurrentGroup = (convs ?? []).some((c) => kind(c) === "lineage_group" && c.lineageId === current?.id);
+  const directPeers = new Set(
+    (convs ?? []).filter((c) => kind(c) === "direct").flatMap((c) => (c.members ?? []).map((m) => m.userId)),
+  );
+  // Người trong họ chưa từng nhắn riêng (đã nhắn thì nằm ở "Tin nhắn riêng").
+  const newPeople = others.filter((m) => !directPeers.has(m.userId));
+
+  const convRow = (c: Conversation, pill?: React.ReactNode) => (
+    <button key={c.id} className={`row${c.unreadCount > 0 ? " unread" : ""}`} onClick={() => setOpen(c)}>
+      <span className={`av${kind(c) === "lineage_group" ? " brand" : ""}`}>
+        {kind(c) === "lineage_group" ? "Họ" : initial(titleOf(c, me))}
+      </span>
+      <span className="grow">
+        <span className="t1">{titleOf(c, me)}</span>
+        <span className="t2">
+          {c.lastMessage
+            ? `${c.lastMessage.senderId === me ? "Bạn" : c.lastMessage.senderName ?? ""}: ${
+                c.lastMessage.recalled ? "đã thu hồi" : c.lastMessage.content ?? ""
+              }`
+            : kind(c) !== "direct" && c.members?.length
+              ? `${c.members.length} thành viên · Chưa có tin nhắn`
+              : "Chưa có tin nhắn"}
+        </span>
+      </span>
+      {pill}
+      {c.unreadCount > 0 && <span className="bell-count">{c.unreadCount}</span>}
+    </button>
+  );
+
   return (
     <>
-      <div className="page-head">
+      <div className="page-head gon">
         <h1 className="page-title">Tin nhắn</h1>
-        <p className="page-desc">Nhóm chat cả họ, nhóm gia đình và nhắn riêng với người trong họ.</p>
+        <p className="page-desc">Phòng chat dòng họ, nhóm gia đình và tin nhắn riêng.</p>
       </div>
       {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
       {!loading && !current && (
@@ -243,101 +279,110 @@ export default function TinNhanPage() {
           Bạn chưa thuộc dòng họ nào. <Link href="/app">Tạo họ hoặc nhập mã mời</Link>.
         </p>
       )}
-      {current && (
-        <div className="btn-row section-gap" style={{ flexWrap: "wrap" }}>
-          <button className="btn primary" disabled={busy} onClick={() => void openGroup()}>
-            Nhóm chat cả họ
-          </button>
-          <button className={`btn${creating ? " primary" : ""}`} onClick={() => setCreating((v) => !v)}>
-            Tạo nhóm gia đình
-          </button>
-        </div>
-      )}
 
-      {creating && current && (
-        <TaoNhom
-          lineageId={current.id}
-          members={members.filter((m) => m.userId !== me)}
-          onCancel={() => setCreating(false)}
-          onCreated={(c) => {
-            setCreating(false);
-            setOpen(c);
-            void loadConvs();
-          }}
+      <label className="searchbar">
+        <BieuTuong ten="tim" size={18} />
+        <input
+          placeholder="Tìm kiếm cuộc trò chuyện"
+          aria-label="Tìm kiếm cuộc trò chuyện"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
         />
-      )}
+      </label>
 
-      <section className="section-gap">
-        <h2 className="card-title">Cuộc trò chuyện</h2>
-        {convs === null ? (
-          <p className="muted-text">Đang tải…</p>
-        ) : convs.length === 0 ? (
-          <p className="muted-text">Chưa có cuộc trò chuyện nào.</p>
-        ) : (
-          <div className="list">
-            {convs.map((c) => (
-              <button
-                key={c.id}
-                className={`list-item${c.unreadCount > 0 ? " unread" : ""}`}
-                onClick={() => setOpen(c)}
-              >
-                <span className="avatar">
-                  {kind(c) === "lineage_group" ? "Họ" : kind(c) === "family_group" ? "Nhà" : initial(titleOf(c, me))}
-                </span>
-                <span className="grow">
-                  <strong>{titleOf(c, me)}</strong>
-                  <span className="sub" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {c.lastMessage
-                      ? `${c.lastMessage.senderId === me ? "Bạn" : c.lastMessage.senderName ?? ""}: ${
-                          c.lastMessage.recalled ? "đã thu hồi" : c.lastMessage.content ?? ""
-                        }`
-                      : "Chưa có tin nhắn"}
-                  </span>
-                </span>
-                {c.unreadCount > 0 && <span className="bell-count">{c.unreadCount}</span>}
-              </button>
-            ))}
-          </div>
-        )}
+      <section aria-label="Phòng chat dòng họ">
+        <h2 className="sec-title">Phòng chat dòng họ</h2>
+        <div className="card rows-card">
+          {groupRooms.map((c) => convRow(c, <span className="pill green">Chung</span>))}
+          {current && !hasCurrentGroup && (
+            <button className="row" disabled={busy} onClick={() => void openGroup()}>
+              <span className="av brand">Họ</span>
+              <span className="grow">
+                <span className="t1">Nhóm chat cả họ</span>
+                <span className="t2">Bấm để vào phòng chat chung của {current.name}</span>
+              </span>
+              <span className="pill green">Chung</span>
+            </button>
+          )}
+          {convs === null && <p className="muted-text">Đang tải…</p>}
+          {convs !== null && groupRooms.length === 0 && !(current && !hasCurrentGroup) && (
+            <p className="muted-text" style={{ padding: "12px 0" }}>Không có phòng nào khớp.</p>
+          )}
+        </div>
       </section>
 
-      {members.length > 1 && (
-        <section className="section-gap">
-          <h2 className="card-title">Nhắn riêng</h2>
-          {members.length > 8 && (
-            <input
-              className="field"
-              placeholder="Tìm người trong họ…"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              style={{ marginBottom: 8 }}
-            />
+      <section aria-label="Nhóm gia đình">
+        <div className="btn-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <h2 className="sec-title">Nhóm “Gia đình tôi”</h2>
+          {current && (
+            <button className={`chip${creating ? " on" : ""}`} onClick={() => setCreating((v) => !v)}>
+              + Tạo nhóm gia đình
+            </button>
           )}
-          <div className="list">
-            {others.map((m) => (
-              <button key={m.userId} className="list-item" disabled={busy} onClick={() => void openDirect(m)}>
-                <span className="avatar">{initial(m.user.displayName)}</span>
+        </div>
+        {creating && current && (
+          <TaoNhom
+            lineageId={current.id}
+            members={members.filter((m) => m.userId !== me)}
+            onCancel={() => setCreating(false)}
+            onCreated={(c) => {
+              setCreating(false);
+              setOpen(c);
+              void loadConvs();
+            }}
+          />
+        )}
+        <div className="card rows-card">
+          {familyRooms.map((c) => convRow(c, <span className="pill blue">Nhóm</span>))}
+          {convs !== null && familyRooms.length === 0 && (
+            <p className="muted-text" style={{ padding: "12px 0" }}>
+              Chưa có nhóm. Lập nhóm nhỏ cho bố mẹ, anh chị em, con cháu.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section aria-label="Tin nhắn riêng">
+        <h2 className="sec-title">Tin nhắn riêng</h2>
+        <div className="card rows-card">
+          {directs.map((c) => convRow(c))}
+          {convs !== null && directs.length === 0 && (
+            <p className="muted-text" style={{ padding: "12px 0" }}>Chưa nhắn riêng với ai.</p>
+          )}
+        </div>
+      </section>
+
+      {newPeople.length > 0 && (
+        <section aria-label="Nhắn riêng">
+          <h2 className="sec-title">Nhắn riêng</h2>
+          <div className="card rows-card">
+            {(f ? newPeople : newPeople.slice(0, 8)).map((m) => (
+              <button key={m.userId} className="row list-item" disabled={busy} onClick={() => void openDirect(m)}>
+                <span className="av">{initial(m.user.displayName)}</span>
                 <span className="grow">
-                  <strong>{m.user.displayName}</strong>
+                  <span className="t1">{m.user.displayName}</span>
+                  <span className="t2">Bắt đầu trò chuyện</span>
                 </span>
               </button>
             ))}
-            {others.length === 0 && <p className="muted-text">Không có ai khớp.</p>}
           </div>
+          {!f && newPeople.length > 8 && (
+            <p className="sub">Còn {newPeople.length - 8} người — gõ tên vào ô tìm kiếm để tìm.</p>
+          )}
         </section>
       )}
 
       {blocks.length > 0 && (
-        <section className="section-gap">
-          <h2 className="card-title">Đã chặn</h2>
-          <div className="list">
+        <section aria-label="Đã chặn">
+          <h2 className="sec-title">Đã chặn</h2>
+          <div className="card rows-card">
             {blocks.map((b) => (
-              <div key={b.userId} className="list-item">
-                <span className="avatar">{initial(b.displayName)}</span>
+              <div key={b.userId} className="row" style={{ cursor: "default" }}>
+                <span className="av">{initial(b.displayName)}</span>
                 <span className="grow">
-                  <strong>{b.displayName}</strong>
+                  <span className="t1">{b.displayName}</span>
                 </span>
-                <button className="btn" onClick={() => void unblock(b.userId)}>
+                <button className="ghost-btn" onClick={() => void unblock(b.userId)}>
                   Bỏ chặn
                 </button>
               </div>
@@ -858,8 +903,14 @@ function PhongChat({
               placeholder="Nhắn tin…"
               style={{ marginTop: 0, resize: "none" }}
             />
-            <button className="btn primary" disabled={sending || !text.trim()} onClick={() => void send()}>
-              {editing ? "Lưu" : "Gửi"}
+            <button
+              className="sendbtn"
+              disabled={sending || !text.trim()}
+              onClick={() => void send()}
+              aria-label={editing ? "Lưu" : "Gửi"}
+              title={editing ? "Lưu" : "Gửi"}
+            >
+              {editing ? "✓" : <BieuTuong ten="gui" size={20} />}
             </button>
           </div>
         )}
