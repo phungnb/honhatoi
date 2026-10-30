@@ -5,7 +5,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // native (plugin, quyền, icon). Xem README.md trong thư mục này.
 // Phải là đúng địa chỉ cuối cùng sau chuyển hướng: Capacitor chỉ nạp cầu native cho đúng
 // origin của server.url.
-const serverUrl = process.env.CAP_SERVER_URL || 'https://honhatoi-web-admin.vercel.app/app'
+const serverUrl = process.env.CAP_SERVER_URL || 'https://honhatoi.vercel.app/app'
 
 const config: CapacitorConfig = {
   // Mã định danh app trên cửa hàng — KHÔNG đổi được sau khi đã nộp lần đầu

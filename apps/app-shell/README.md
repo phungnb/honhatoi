@@ -1,7 +1,7 @@
 # Họ Nhà Tôi — App Android/iOS (vỏ Capacitor)
 
 App trên điện thoại là một vỏ native mở thẳng web app
-(`https://honhatoi-web-admin.vercel.app/app`), cùng cách làm với RaceHub.
+(`https://honhatoi.vercel.app/app`), cùng cách làm với RaceHub.
 
 - **Cập nhật giao diện, tính năng:** chỉ cần deploy web (`apps/web-admin`). Người
   dùng mở app là thấy bản mới, không phải nộp lại cửa hàng.
