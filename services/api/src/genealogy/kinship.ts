@@ -17,7 +17,9 @@
  * - 'ex_spouse' KHÔNG dùng để đi đường (tránh danh xưng qua vợ/chồng cũ).
  *
  * Giới hạn có chủ ý (ghi rõ để không xưng sai cho người đã khuất):
- * - Chỉ ánh xạ chắc chắn tới 3 bước (trừ chuỗi thuần lên/xuống tới 5 đời).
+ * - Ánh xạ chắc chắn tới 3 bước, thêm họ hàng xa phổ biến: anh/chị/em họ,
+ *   cháu họ, ông bác/ông chú/bà cô, bác/chú/cô/cậu/dì họ (kiểm toán M2);
+ *   chuỗi thuần lên/xuống tới 5 đời.
  * - So sánh tuổi cần năm sinh của cả hai người; thiếu thì trả danh xưng
  *   mơ hồ kèm ghi chú, không đoán mò.
  * - Bên nội/ngoại của bác/chú/cô/cậu/dì xác định qua giới tính của cha/mẹ
@@ -267,6 +269,54 @@ function titleForPath(
     case 'up,down,down': {
       // Cháu (con của anh/chị/em).
       return { title: gendered(to, 'Cháu trai', 'Cháu gái', 'Cháu'), note: null };
+    }
+    case 'up,up,down,down': {
+      // Anh/chị/em họ (con của bác/chú/cô/cậu/dì). Vai vế theo thứ bậc
+      // của hai cha/mẹ, không theo tuổi hai người: con nhà bác là anh/chị
+      // dù ít tuổi hơn.
+      const myParent = personAt(1);
+      const theirParent = personAt(3);
+      const age = compareAge(theirParent, myParent);
+      if (age > 0) return { title: gendered(to, 'Anh họ', 'Chị họ', 'Anh/Chị họ'), note: null };
+      if (age < 0) return { title: 'Em họ', note: null };
+      return {
+        title: gendered(to, 'Anh/Em họ', 'Chị/Em họ', 'Anh/Chị/Em họ'),
+        note: 'Không rõ năm sinh của hai cha/mẹ nên chưa phân biệt được vai trên với vai dưới.',
+      };
+    }
+    case 'up,up,down,down,down': {
+      // Con của anh/chị/em họ.
+      return { title: gendered(to, 'Cháu họ', 'Cháu họ', 'Cháu họ'), note: null };
+    }
+    case 'up,up,up,down': {
+      // Anh/chị/em của ông/bà: ông bác, ông chú, bà cô (nội) / ông cậu, bà dì (ngoại).
+      const grand = personAt(2);
+      const age = compareAge(to, grand);
+      if (age > 0) return { title: gendered(to, 'Ông bác', 'Bà bác', 'Ông/Bà bác'), note: null };
+      if (age < 0) {
+        if (grand.gender === 'male') return { title: gendered(to, 'Ông chú', 'Bà cô', 'Ông chú/Bà cô'), note: null };
+        if (grand.gender === 'female') return { title: gendered(to, 'Ông cậu', 'Bà dì', 'Ông cậu/Bà dì'), note: null };
+      }
+      return {
+        title: gendered(to, 'Ông', 'Bà', 'Ông/Bà'),
+        note: 'Là anh/chị/em của ông/bà; thiếu năm sinh hoặc giới tính nên chưa xưng cụ thể.',
+      };
+    }
+    case 'up,up,up,down,down': {
+      // Con của ông bác/ông chú…: bác họ, chú họ, cô họ (nội) / cậu họ, dì họ (ngoại).
+      const parent = personAt(1);
+      const grand = personAt(2);
+      const grandSibling = personAt(4);
+      const age = compareAge(grandSibling, grand);
+      if (age > 0) return { title: 'Bác họ', note: null };
+      if (age < 0) {
+        if (parent.gender === 'male') return { title: gendered(to, 'Chú họ', 'Cô họ', 'Chú/Cô họ'), note: null };
+        if (parent.gender === 'female') return { title: gendered(to, 'Cậu họ', 'Dì họ', 'Cậu/Dì họ'), note: null };
+      }
+      return {
+        title: 'Bác họ',
+        note: 'Không rõ năm sinh hoặc bên nội/ngoại nên mặc định xưng Bác họ (cách xưng tôn trọng).',
+      };
     }
     case 'up,down,across': {
       // Dâu/rể (vợ/chồng của anh/chị/em).

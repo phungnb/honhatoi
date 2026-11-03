@@ -3,14 +3,16 @@
 /** Nhật ký thao tác của dòng họ (chỉ Ban quản trị): ai làm gì, lúc nào. */
 
 import { useCallback, useEffect, useState } from "react";
-import { get } from "@/lib/api";
+import { get, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 
 interface Log {
   id: string;
   action: string;
   actorName: string | null;
+  targetId?: string | null;
   targetName: string | null;
+  canRestore?: boolean;
   createdAt: string;
 }
 
@@ -25,6 +27,7 @@ const ACTION: Record<string, string> = {
   "genealogy.person.create": "thêm người vào cây",
   "genealogy.person.update": "sửa hồ sơ",
   "genealogy.person.delete": "xóa người khỏi cây",
+  "genealogy.person.restore": "khôi phục người vào cây",
   "genealogy.relationship.create": "thêm quan hệ",
   "genealogy.relationship.delete": "xóa quan hệ",
   "genealogy.change.approve": "duyệt đề xuất gia phả",
@@ -52,6 +55,25 @@ export default function NhatKy({ lineageId }: { lineageId: string }) {
   const [logs, setLogs] = useState<Log[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  async function restore(l: Log) {
+    if (!l.targetId) return;
+    setErr(null);
+    setInfo(null);
+    try {
+      const b = await post<{ data?: { relationshipsRestored?: number } }>(
+        `/genealogy/persons/${l.targetId}/restore`,
+        {},
+      );
+      setInfo(
+        `Đã khôi phục ${l.targetName ?? "hồ sơ"} cùng ${b?.data?.relationshipsRestored ?? 0} quan hệ.`,
+      );
+      await load();
+    } catch (e) {
+      setErr(apiMessage(e));
+    }
+  }
 
   const load = useCallback(
     async (before?: string) => {
@@ -78,6 +100,7 @@ export default function NhatKy({ lineageId }: { lineageId: string }) {
     <>
       <p className="sub">Mọi thao tác quan trọng trong họ được ghi lại, không ai sửa hay xóa được.</p>
       {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
+      {info && <p style={{ color: "var(--brand)" }}>{info}</p>}
       {logs === null ? (
         <p className="muted-text">Đang tải…</p>
       ) : logs.length === 0 ? (
@@ -90,6 +113,14 @@ export default function NhatKy({ lineageId }: { lineageId: string }) {
               <span>
                 <strong>{l.actorName ?? "Hệ thống"}</strong> {ACTION[l.action] ?? l.action}
                 {l.targetName ? `: ${l.targetName}` : ""}
+                {l.canRestore && (
+                  <>
+                    {" "}
+                    <button className="btn" onClick={() => void restore(l)}>
+                      Khôi phục
+                    </button>
+                  </>
+                )}
               </span>
             </li>
           ))}

@@ -6,6 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+
+/** Hạn mặc định của mã mời (giờ). */
+const INVITE_DEFAULT_HOURS = 24 * 7;
 import { PrismaService } from '../prisma/prisma.service';
 import { LineageRole, Prisma } from '@prisma/client';
 import { Actor, LineageAction, can } from '../common/permissions';
@@ -617,9 +620,11 @@ export class LineagesService {
         code,
         createdBy: userId,
         maxUses: opts.maxUses ?? null,
-        expiresAt: opts.expiresInHours
-          ? new Date(Date.now() + opts.expiresInHours * 3600_000)
-          : null,
+        // Mặc định hết hạn sau 7 ngày: mã hay bị chuyển tiếp qua Zalo, để
+        // vĩnh viễn thì người ngoài vào họ lúc nào cũng được (kiểm toán M4).
+        expiresAt: new Date(
+          Date.now() + (opts.expiresInHours ?? INVITE_DEFAULT_HOURS) * 3600_000,
+        ),
       },
     });
     await this.audit(

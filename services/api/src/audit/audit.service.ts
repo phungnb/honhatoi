@@ -43,10 +43,11 @@ export class AuditService {
     const persons = personIds.length
       ? await this.prisma.familyPerson.findMany({
           where: { id: { in: personIds } },
-          select: { id: true, fullName: true },
+          select: { id: true, fullName: true, deletedAt: true },
         })
       : [];
     const personName = new Map(persons.map((p) => [p.id, p.fullName]));
+    const deleted = new Set(persons.filter((p) => p.deletedAt).map((p) => p.id));
 
     return {
       data: {
@@ -55,7 +56,13 @@ export class AuditService {
           action: r.action,
           actorName: r.actor?.displayName ?? null,
           targetType: r.targetType,
+          targetId: r.targetId,
           targetName: r.targetId ? (personName.get(r.targetId) ?? null) : null,
+          // Hồ sơ vẫn đang bị xóa → cho nút "Khôi phục" (kiểm toán H2).
+          canRestore:
+            r.action === 'genealogy.person.delete' &&
+            !!r.targetId &&
+            deleted.has(r.targetId),
           createdAt: r.createdAt,
         })),
         next_before: rows.length > take ? page[page.length - 1].createdAt : null,
