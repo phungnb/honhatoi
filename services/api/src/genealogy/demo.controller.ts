@@ -62,13 +62,13 @@ export class DemoController {
   }
 
   @Get('kinship')
-  kinship(@Query('from') from?: string, @Query('to') to?: string) {
+  kinship(@Query('from') from?: string, @Query('to') to?: string, @Query('mien') mien?: string) {
     if (!from || !to)
       throw new BadRequestException({
         code: 'MISSING_QUERY',
         message: 'Cần đủ tham số from và to',
       });
-    return this.genealogy.kinship(DEMO_LINEAGE_ID, '', from, to);
+    return this.genealogy.kinship(DEMO_LINEAGE_ID, '', from, to, mien === 'nam' || mien === 'bac' ? mien : undefined);
   }
 
   @Get('persons/:id')

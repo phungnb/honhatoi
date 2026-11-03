@@ -98,7 +98,7 @@ export class GenealogyService {
 
   /**
    * Quyền hiệu lực của user trong lineage — suy ra DUY NHẤT từ vai trò +
-   * cờ Trưởng tộc qua can() (common/permissions.ts). Bảng
+   * cờ Chủ gia phả qua can() (common/permissions.ts). Bảng
    * genealogy_permissions không còn được đọc.
    * Bắt buộc là thành viên đã duyệt: các route /persons/:id, /proposals/:id…
    * không đi qua LineageGuard nên phải kiểm tra ở đây.
@@ -1377,6 +1377,7 @@ export class GenealogyService {
     userId: string,
     fromId: string,
     toId: string,
+    region?: 'bac' | 'nam',
   ) {
     const perm = await this.effectivePerm(lineageId, userId);
     this.require(perm, 'canView', 'xem danh xưng vai vế');
@@ -1407,13 +1408,54 @@ export class GenealogyService {
         dateOfBirth: p.dateOfBirth ? p.dateOfBirth.toISOString() : null,
       })),
       relations,
+      region,
     );
     if (!result)
       throw new NotFoundException({
         code: 'PERSON_NOT_FOUND',
         message: 'Một trong hai người không thuộc dòng họ này',
       });
-    return { data: result, error: null };
+    // Họ mẫu gọi với userId rỗng: không có cách gọi riêng.
+    const note = userId
+      ? await this.prisma.kinshipNote.findUnique({
+          where: { userId_fromPersonId_toPersonId: { userId, fromPersonId: fromId, toPersonId: toId } },
+          select: { title: true, note: true, updatedAt: true },
+        })
+      : null;
+    return { data: { ...result, myNote: note }, error: null };
+  }
+
+  /** Cách xưng hô riêng (chỉ người lưu thấy). Hai người phải thuộc họ này. */
+  async saveKinshipNote(
+    lineageId: string,
+    userId: string,
+    dto: { fromId: string; toId: string; title: string; note?: string },
+  ) {
+    const perm = await this.effectivePerm(lineageId, userId);
+    this.require(perm, 'canView', 'lưu cách xưng hô');
+    const n = await this.prisma.familyPerson.count({
+      where: { lineageId, deletedAt: null, id: { in: [dto.fromId, dto.toId] } },
+    });
+    if (n !== 2)
+      throw new NotFoundException({
+        code: 'PERSON_NOT_FOUND',
+        message: 'Một trong hai người không thuộc dòng họ này',
+      });
+    const data = { title: dto.title.trim(), note: dto.note?.trim() || null };
+    const note = await this.prisma.kinshipNote.upsert({
+      where: { userId_fromPersonId_toPersonId: { userId, fromPersonId: dto.fromId, toPersonId: dto.toId } },
+      create: { lineageId, userId, fromPersonId: dto.fromId, toPersonId: dto.toId, ...data },
+      update: data,
+      select: { title: true, note: true, updatedAt: true },
+    });
+    return { data: { myNote: note }, error: null };
+  }
+
+  async deleteKinshipNote(lineageId: string, userId: string, fromId: string, toId: string) {
+    await this.prisma.kinshipNote.deleteMany({
+      where: { lineageId, userId, fromPersonId: fromId, toPersonId: toId },
+    });
+    return { data: { myNote: null }, error: null };
   }
 
   /** GET /genealogy/persons/:id/history — lịch sử từ các đề xuất đã duyệt (GP-09). */
@@ -1841,7 +1883,7 @@ export class GenealogyService {
 
   // ------------------------------------------------- liên kết tài khoản
 
-  /** Người duyệt liên kết: Trưởng tộc + Ban quản trị + Người giữ gia phả. */
+  /** Người duyệt liên kết: Chủ gia phả + Ban quản trị + Người giữ gia phả. */
   private async verifierIds(lineageId: string, except: string) {
     const [lineage, ms] = await Promise.all([
       this.prisma.lineage.findUnique({ where: { id: lineageId }, select: { ownerUserId: true } }),

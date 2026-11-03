@@ -4,7 +4,7 @@
  * Cổng quản lý dòng họ — MỘT nơi cho mọi việc quản trị của một họ:
  * dựng cây gia phả, duyệt đề xuất, duyệt người vào họ, thành viên & vai
  * trò, mã mời.
- * Mục hiện theo vai trò (Người giữ gia phả / Ban quản trị / Trưởng tộc);
+ * Mục hiện theo vai trò (Người giữ gia phả / Ban quản trị / Chủ gia phả);
  * backend vẫn kiểm tra quyền ở mọi API.
  */
 
@@ -38,8 +38,55 @@ interface Member {
   userId: string;
   role: LineageRole;
   isOwner: boolean;
+  title?: string | null;
   branch?: string | null;
   user: { id: string; displayName: string };
+}
+
+/** Chức danh thường gặp trong họ; "Khác…" để tự điền. Chỉ để hiển thị, không cấp quyền. */
+const TITLES = ["Trưởng tộc", "Phó tộc trưởng", "Trưởng chi", "Trưởng phái", "Thủ từ", "Thủ quỹ", "Ban liên lạc"];
+
+function ChucDanh({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const preset = !value || TITLES.includes(value);
+  const [other, setOther] = useState(!preset);
+  const [text, setText] = useState(preset ? "" : value);
+  if (other)
+    return (
+      <span className="btn-row" style={{ gap: 6, flexWrap: "nowrap" }}>
+        <input
+          className="field"
+          style={{ ...selectStyle, minWidth: 120 }}
+          value={text}
+          maxLength={100}
+          placeholder="VD: Trưởng ban khuyến học"
+          aria-label="Chức danh khác"
+          onChange={(e) => setText(e.target.value)}
+        />
+        <button className="btn" onClick={() => onSave(text.trim())}>
+          Lưu
+        </button>
+        <button className="btn" onClick={() => setOther(false)}>
+          Hủy
+        </button>
+      </span>
+    );
+  return (
+    <select
+      style={selectStyle}
+      value={value}
+      aria-label="Chức danh trong họ"
+      onChange={(e) => (e.target.value === "__khac" ? setOther(true) : onSave(e.target.value))}
+    >
+      <option value="">— Không —</option>
+      {TITLES.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+      {!preset && <option value={value}>{value}</option>}
+      <option value="__khac">Khác…</option>
+    </select>
+  );
 }
 
 interface Invite {
@@ -339,7 +386,7 @@ function Members({
     }
   }
 
-  /** Ban quản trị đổi được MEMBER/EDITOR; chỉ Trưởng tộc đụng tới ADMIN. */
+  /** Ban quản trị đổi được MEMBER/EDITOR; chỉ Chủ gia phả đụng tới ADMIN. */
   function editable(m: Member): boolean {
     if (m.isOwner || m.userId === myUserId) return false;
     if (owner) return true;
@@ -350,13 +397,19 @@ function Members({
   return (
     <>
       {msg && <p className="muted-text">{msg}</p>}
+      <p className="muted-text">
+        Chức danh (Trưởng tộc, Trưởng chi…) là danh vị trong họ, gán cho đúng người. Quyền trong app
+        (Chủ gia phả, Ban quản trị, Người giữ gia phả) là ai được sửa gì; người lập gia phả không nhất
+        thiết là Trưởng tộc.
+      </p>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Thành viên</th>
               <th>Chi</th>
-              <th>Vai trò</th>
+              <th>Chức danh trong họ</th>
+              <th>Quyền trong app</th>
               {admin && <th></th>}
             </tr>
           </thead>
@@ -368,6 +421,22 @@ function Members({
                   {m.userId === myUserId ? " (bạn)" : ""}
                 </td>
                 <td>{m.branch ?? "—"}</td>
+                <td>
+                  {admin ? (
+                    <ChucDanh
+                      key={m.title ?? ""}
+                      value={m.title ?? ""}
+                      onSave={(v) =>
+                        void run(
+                          v ? `Đã gán chức danh ${v} cho ${m.user.displayName}.` : `Đã bỏ chức danh của ${m.user.displayName}.`,
+                          () => patch(`/lineages/${lineageId}/members/${m.userId}/title`, { title: v || null }),
+                        )
+                      }
+                    />
+                  ) : (
+                    m.title ?? "—"
+                  )}
+                </td>
                 <td>
                   {editable(m) ? (
                     <select
@@ -400,11 +469,11 @@ function Members({
                           onClick={() => {
                             if (
                               window.confirm(
-                                `Chuyển quyền Trưởng tộc cho ${m.user.displayName}? Bạn sẽ còn là Ban quản trị.`,
+                                `Chuyển quyền Chủ gia phả cho ${m.user.displayName}? Bạn sẽ còn là Ban quản trị.`,
                               )
                             )
                               void run(
-                                `Đã chuyển quyền Trưởng tộc cho ${m.user.displayName}.`,
+                                `Đã chuyển quyền Chủ gia phả cho ${m.user.displayName}.`,
                                 async () => {
                                   await post(`/lineages/${lineageId}/transfer-ownership`, {
                                     userId: m.userId,
@@ -414,7 +483,7 @@ function Members({
                               );
                           }}
                         >
-                          Chuyển Trưởng tộc
+                          Chuyển Chủ gia phả
                         </button>
                       )}
                       {editable(m) && (

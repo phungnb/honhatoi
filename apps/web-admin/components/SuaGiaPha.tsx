@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Dựng cây gia phả trên web (Người giữ gia phả / Ban quản trị / Trưởng tộc):
+ * Dựng cây gia phả trên web (Người giữ gia phả / Ban quản trị / Chủ gia phả):
  * thêm người kèm quan hệ với người đã có, sửa thông tin, xóa. Đời được tự
  * tính từ quan hệ (con = đời cha mẹ + 1, vợ/chồng = cùng đời). Backend
  * vẫn kiểm tra quyền; người không đủ quyền sẽ thành đề xuất chờ duyệt.
@@ -142,7 +142,11 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
         : editing?.deathLunarDay
           ? { deathLunarDay: null, deathLunarMonth: null, deathLunarLeap: false }
           : {}),
-      ...(form.burialPlace.trim() ? { burialPlace: form.burialPlace.trim() } : {}),
+      ...(form.burialPlace.trim()
+        ? { burialPlace: form.burialPlace.trim() }
+        : editing?.burialPlace
+          ? { burialPlace: null }
+          : {}),
       ...(form.branch.trim() ? { branch: form.branch.trim() } : {}),
     };
   }
@@ -366,13 +370,29 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
               style={inputStyle}
               type="date"
               value={form.dateOfDeath}
-              onChange={(e) => set("dateOfDeath")(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                set("dateOfDeath")(v);
+                // Biết ngày dương thì tự điền ngày giỗ âm (vẫn sửa tay được).
+                if (v && !form.lunarDeath.trim())
+                  get<{ data?: { lunar?: { day: number; month: number; isLeap?: boolean } } }>(
+                    `/genealogy/lunar/convert?date=${v}`,
+                  )
+                    .then((b) => {
+                      const l = b?.data?.lunar;
+                      if (l)
+                        setForm((f) =>
+                          f.lunarDeath.trim() ? f : { ...f, lunarDeath: `${l.day}/${l.month}`, lunarLeap: !!l.isLeap },
+                        );
+                    })
+                    .catch(() => undefined);
+              }}
             />
           </label>
         </div>
         <div className="btn-row" style={{ flexWrap: "wrap", gap: 12, marginTop: 12, alignItems: "flex-end" }}>
           <label className="muted-text" style={{ flex: "1 1 160px" }}>
-            Ngày mất âm lịch (ngày giỗ), VD 15/8
+            Ngày giỗ (âm lịch), VD 15/8
             <input
               style={inputStyle}
               value={form.lunarDeath}
@@ -393,12 +413,13 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
         </div>
         {(form.dateOfDeath || form.lunarDeath) && (
           <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
-            Phần mộ ở đâu
-            <input
-              style={inputStyle}
+            Phần mộ ở đâu (ghi chú: nghĩa trang, khu, hàng, lối vào…)
+            <textarea
+              style={{ ...inputStyle, minHeight: 64, resize: "vertical" }}
               value={form.burialPlace}
+              maxLength={255}
               onChange={(e) => set("burialPlace")(e.target.value)}
-              placeholder="VD: Nghĩa trang họ, xã Thanh Ngọc"
+              placeholder="VD: Nghĩa trang họ Nguyễn, xã Thanh Ngọc; khu B, hàng 2, mộ thứ 3 tính từ cổng"
             />
           </label>
         )}

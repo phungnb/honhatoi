@@ -2,7 +2,7 @@
 
 /**
  * Xóa tài khoản (App Store / Google Play bắt buộc có trong app). Phải gõ
- * XOA để xác nhận. Trưởng tộc của họ còn thành viên phải chuyển quyền trước
+ * XOA để xác nhận. Chủ gia phả của họ còn thành viên phải chuyển quyền trước
  * (API trả OWNS_LINEAGE, hiện nguyên lời nhắn).
  */
 

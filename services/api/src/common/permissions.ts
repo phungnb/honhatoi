@@ -3,7 +3,7 @@ import { LineageRole } from '@prisma/client';
 /**
  * Ma trận quyền dùng chung — MỘT nguồn sự thật cho mọi module.
  *
- * 3 vai trò trong dòng họ + cờ người sở hữu (Trưởng tộc). Quyền gia phả,
+ * 3 vai trò trong dòng họ + cờ người sở hữu (Chủ gia phả). Quyền gia phả,
  * quản trị thành viên, sự kiện, chat đều suy ra từ đây; không còn bảng cờ
  * quyền riêng (genealogy_permissions không được đọc nữa).
  */
@@ -55,7 +55,7 @@ export function can(actor: Actor, action: LineageAction): boolean {
 
 /** Nhãn đời thường hiển thị cho người dùng. */
 export function roleLabel(actor: Actor): string {
-  if (actor.isOwner) return 'Trưởng tộc';
+  if (actor.isOwner) return 'Chủ gia phả';
   switch (actor.role) {
     case LineageRole.ADMIN:
       return 'Ban quản trị';

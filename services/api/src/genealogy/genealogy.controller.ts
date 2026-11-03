@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UseGuards,
@@ -20,6 +21,7 @@ import { UpdatePersonDto } from './dto/update-person.dto';
 import { CreateRelationshipDto } from './dto/create-relationship.dto';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { ReviewProposalDto } from './dto/review-proposal.dto';
+import { KinshipNoteDto } from './dto/kinship-note.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { LineageGuard } from '../common/guards/lineage.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
@@ -181,13 +183,39 @@ export class GenealogyController {
     @CurrentUserId() userId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('mien') mien?: string,
   ) {
     if (!from || !to)
       throw new BadRequestException({
         code: 'MISSING_QUERY',
         message: 'Cần đủ tham số from và to (id của hai người cần xem vai vế)',
       });
-    return this.genealogy.kinship(lineageId, userId, from, to);
+    return this.genealogy.kinship(lineageId, userId, from, to, mien === 'nam' || mien === 'bac' ? mien : undefined);
+  }
+
+  /// PUT /genealogy/lineages/:lineageId/kinship-notes — lưu cách xưng hô
+  /// riêng của mình với một người (chọn Cô/Dì/Chú/Bác/Dượng… hoặc tự điền).
+  @Put('lineages/:lineageId/kinship-notes')
+  @UseGuards(LineageGuard)
+  saveKinshipNote(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: KinshipNoteDto,
+  ) {
+    return this.genealogy.saveKinshipNote(lineageId, userId, dto);
+  }
+
+  @Delete('lineages/:lineageId/kinship-notes')
+  @UseGuards(LineageGuard)
+  deleteKinshipNote(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!from || !to)
+      throw new BadRequestException({ code: 'MISSING_QUERY', message: 'Cần đủ tham số from và to' });
+    return this.genealogy.deleteKinshipNote(lineageId, userId, from, to);
   }
 
   /// GET /genealogy/lunar/convert?date=YYYY-MM-DD — đổi dương sang âm

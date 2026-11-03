@@ -11,11 +11,11 @@ const FEATURES = [
   ["Tra vai vế", "Chọn hai người, app cho biết người kia là bác, chú, cô hay cháu của mình."],
   ["Sự kiện dòng họ", "Giỗ tổ, họp họ, mừng thọ: tạo sự kiện, mọi người báo tham gia."],
   ["Nhắn tin cả họ", "Nhóm chat riêng của dòng họ và nhắn riêng với từng người."],
-  ["Phân vai rõ ràng", "Trưởng tộc, Ban quản trị, Người giữ gia phả, Thành viên: ai làm gì đều rõ."],
+  ["Phân vai rõ ràng", "Chủ gia phả, Ban quản trị, Người giữ gia phả, Thành viên: ai làm gì đều rõ."],
 ] as const;
 
 const STEPS = [
-  ["Tạo dòng họ", "Người đứng ra (thường là Trưởng tộc) tạo họ và dựng vài đời đầu."],
+  ["Tạo dòng họ", "Một người con cháu đứng ra tạo họ (Chủ gia phả) và dựng vài đời đầu. Trưởng tộc là chức danh, gán riêng cho đúng người."],
   ["Mời con cháu", "Gửi link mời qua Zalo; người nhận bấm vào là vào đúng họ."],
   ["Cùng hoàn thiện", "Con cháu bổ sung thông tin, Ban quản trị duyệt để cây luôn đúng."],
 ] as const;

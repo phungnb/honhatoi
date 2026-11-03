@@ -148,6 +148,7 @@ model User {
 
   // CHECK (phone IS NOT NULL OR email IS NOT NULL) — bổ sung trong migration SQL.
   @@map("users")
+  kinshipNotes        KinshipNote[]
 }
 
 /// Hồ sơ cá nhân của chủ tài khoản (khác family_persons).
@@ -255,6 +256,9 @@ model Lineage {
   events           Event[]
   polls            Poll[]
   auditLogs        AuditLog[]
+  historyEntries   LineageHistoryEntry[]
+  ceremonies       LineageCeremony[]
+  kinshipNotes     KinshipNote[]
 
   @@map("lineages")
 }
@@ -270,6 +274,9 @@ model LineageMembership {
   status           String      @default("pending") @db.VarChar(20)
   requestedBranch  String?     @map("requested_branch") @db.VarChar(255)
   requestedRelation String?    @map("requested_relation") @db.Text
+  /// Chức danh trong họ (Trưởng tộc, Trưởng chi, Thủ từ…) — tách khỏi quyền
+  /// trong app: người lập gia phả (Chủ gia phả) không nhất thiết là Trưởng tộc.
+  title            String?     @db.VarChar(100)
   reviewedBy       String?     @map("reviewed_by") @db.Uuid
   reviewer         User?       @relation("MembershipReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
   joinedAt         DateTime?   @map("joined_at") @db.Timestamptz(6)
@@ -873,4 +880,71 @@ model DataDeletionRequest {
   completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
 
   @@map("data_deletion_requests")
+}
+
+/// Trang Lịch sử dòng họ: các mục (nguồn gốc, di cư, nhà thờ họ, công trạng…)
+/// do Người giữ gia phả trở lên viết, cả họ đọc.
+model LineageHistoryEntry {
+  id        String    @id @default(uuid()) @db.Uuid
+  lineageId String    @map("lineage_id") @db.Uuid
+  lineage   Lineage   @relation(fields: [lineageId], references: [id], onDelete: Cascade)
+  title     String    @db.VarChar(200)
+  /// Mốc thời gian tự do: "Thế kỷ 17", "1945", "Đời thứ 3".
+  period    String?   @db.VarChar(100)
+  content   String    @db.Text
+  sortOrder Int       @default(0) @map("sort_order")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([lineageId, sortOrder])
+  @@map("lineage_history_entries")
+}
+
+/// Giỗ chạp chung của họ/chi lặp lại hằng năm theo âm lịch (giỗ tổ, giỗ họ,
+/// giỗ chi, tảo mộ…), khác giỗ từng người (lấy từ ngày mất trong hồ sơ).
+model LineageCeremony {
+  id         String    @id @default(uuid()) @db.Uuid
+  lineageId  String    @map("lineage_id") @db.Uuid
+  lineage    Lineage   @relation(fields: [lineageId], references: [id], onDelete: Cascade)
+  name       String    @db.VarChar(200)
+  /// gio_to | gio_ho | gio_chi | tao_mo | khac
+  kind       String    @default("gio_ho") @db.VarChar(20)
+  lunarDay   Int       @map("lunar_day") @db.SmallInt
+  lunarMonth Int       @map("lunar_month") @db.SmallInt
+  lunarLeap  Boolean   @default(false) @map("lunar_leap")
+  /// Chi/nhánh đứng ra tổ chức (trống = cả họ).
+  branch     String?   @db.VarChar(255)
+  location   String?   @db.VarChar(255)
+  note       String?   @db.Text
+  createdBy  String?   @map("created_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([lineageId])
+  @@map("lineage_ceremonies")
+}
+
+/// Cách xưng hô riêng của một tài khoản với một người trong cây: danh xưng
+/// khác nhau giữa miền Bắc/Nam và từng nhà, nên cho tự chọn/tự điền kèm ghi chú.
+/// Chỉ người tạo xem được.
+model KinshipNote {
+  id           String   @id @default(uuid()) @db.Uuid
+  lineageId    String   @map("lineage_id") @db.Uuid
+  lineage      Lineage  @relation(fields: [lineageId], references: [id], onDelete: Cascade)
+  userId       String   @map("user_id") @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromPersonId String   @map("from_person_id") @db.Uuid
+  toPersonId   String   @map("to_person_id") @db.Uuid
+  title        String   @db.VarChar(50)
+  note         String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([userId, fromPersonId, toPersonId])
+  @@index([lineageId])
+  @@map("kinship_notes")
 }

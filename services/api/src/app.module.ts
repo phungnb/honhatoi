@@ -12,6 +12,7 @@ import { AdminModule } from './admin/admin.module';
 import { PostsModule } from './posts/posts.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
+import { HistoryModule } from './history/history.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AuditModule } from './audit/audit.module';
     PostsModule,
     ReportsModule,
     AuditModule,
+    HistoryModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
