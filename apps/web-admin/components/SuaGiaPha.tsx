@@ -20,6 +20,7 @@ interface Person {
   dateOfBirth?: string | null;
   dateOfDeath?: string | null;
   deathYearOnly?: boolean;
+  isDeceased?: boolean;
   burialPlace?: string | null;
   deathLunarDay?: number | null;
   deathLunarMonth?: number | null;
@@ -50,6 +51,24 @@ const RELATION_LABEL: Record<Relation, string> = {
 
 const year = (iso?: string | null) => (iso ? iso.slice(0, 4) : "");
 
+/** Dữ liệu ngày mất đã lưu → ô "Ngày mất" (ưu tiên âm lịch vì đó là ngày làm giỗ). */
+function deathForm(p: Person) {
+  const y = year(p.dateOfDeath);
+  const dead = !!(p.isDeceased || p.dateOfDeath || p.deathLunarDay);
+  if (p.deathLunarDay && p.deathLunarMonth)
+    return {
+      deathCal: "al" as const,
+      deathText: `${p.deathLunarDay}/${p.deathLunarMonth}${y ? `/${y}` : ""}`,
+      lunarLeap: !!p.deathLunarLeap,
+      deceased: dead,
+    };
+  if (p.dateOfDeath && !p.deathYearOnly) {
+    const [yy, mm, dd] = p.dateOfDeath.slice(0, 10).split("-");
+    return { deathCal: "dl" as const, deathText: `${Number(dd)}/${Number(mm)}/${yy}`, lunarLeap: false, deceased: dead };
+  }
+  return { deathCal: "al" as const, deathText: y, lunarLeap: false, deceased: dead };
+}
+
 /** Chuẩn hoá tên để so trùng: bỏ dấu, gộp khoảng trắng, chữ thường. */
 const foldName = (s: string) =>
   s
@@ -64,9 +83,10 @@ const EMPTY = {
   fullName: "",
   gender: "male",
   birthYear: "",
-  deathYear: "",
-  dateOfDeath: "",
-  lunarDeath: "",
+  deathCal: "al" as "al" | "dl",
+  deathText: "",
+  deceased: false,
+  deathDirty: false,
   lunarLeap: false,
   burialPlace: "",
   branch: "",
@@ -122,34 +142,58 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     });
   }, [form.fullName, form.birthYear, persons, editing]);
 
-  /** "15/8" → { day: 15, month: 8 }; sai dạng → null. */
-  function parseLunar(v: string) {
-    const m = /^\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*$/.exec(v);
+  /** "1985" | "15/8" | "15/8/1985" → phần đã biết; sai dạng → null. */
+  function parseDeath(v: string): { day?: number; month?: number; year?: number } | null {
+    const t = v.trim().replace(/[-.\s]+/g, "/");
+    if (!t) return {};
+    let m = /^(\d{4})$/.exec(t);
+    if (m) return { year: Number(m[1]) };
+    m = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/.exec(t);
     if (!m) return null;
     const day = Number(m[1]);
     const month = Number(m[2]);
-    return day >= 1 && day <= 30 && month >= 1 && month <= 12 ? { day, month } : null;
+    const year = m[3] ? Number(m[3]) : undefined;
+    if (day < 1 || day > (form.deathCal === "al" ? 30 : 31) || month < 1 || month > 12) return null;
+    return { day, month, year };
+  }
+
+  function deathError(): string | null {
+    const d = parseDeath(form.deathText);
+    if (!d) return "Ngày mất ghi dạng ngày/tháng/năm, ngày/tháng hoặc năm.";
+    if (form.deathCal === "dl" && d.day && !d.year) return "Ngày mất dương lịch cần có năm.";
+    if (form.deathCal === "dl" && d.day && d.year) {
+      const dt = new Date(Date.UTC(d.year, d.month! - 1, d.day));
+      if (dt.getUTCDate() !== d.day) return "Ngày mất không có thật.";
+    }
+    return null;
+  }
+
+  function deathBody() {
+    if (!form.deathDirty) return {};
+    const d = parseDeath(form.deathText) ?? {};
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const solarFull = form.deathCal === "dl" && d.day && d.year;
+    const lunar = form.deathCal === "al" && d.day;
+    return {
+      isDeceased: form.deceased || !!form.deathText.trim(),
+      ...(solarFull
+        ? { dateOfDeath: `${d.year}-${pad(d.month!)}-${pad(d.day!)}`, deathYearOnly: false }
+        : d.year
+          ? { dateOfDeath: `${d.year}-01-01`, deathYearOnly: true }
+          : { dateOfDeath: null, deathYearOnly: false }),
+      ...(lunar
+        ? { deathLunarDay: d.day, deathLunarMonth: d.month, deathLunarLeap: form.lunarLeap }
+        : { deathLunarDay: null, deathLunarMonth: null, deathLunarLeap: false }),
+    };
   }
 
   function personBody() {
     const y = form.birthYear.trim();
-    const lunar = parseLunar(form.lunarDeath);
     return {
       fullName: form.fullName.trim(),
       gender: form.gender,
       ...(y ? { dateOfBirth: `${y}-01-01`, birthYearOnly: true } : {}),
-      ...(form.dateOfDeath
-        ? { dateOfDeath: form.dateOfDeath, deathYearOnly: false }
-        : /^\d{4}$/.test(form.deathYear.trim())
-          ? { dateOfDeath: `${form.deathYear.trim()}-01-01`, deathYearOnly: true }
-          : editing?.dateOfDeath
-            ? { dateOfDeath: null, deathYearOnly: false }
-            : {}),
-      ...(lunar
-        ? { deathLunarDay: lunar.day, deathLunarMonth: lunar.month, deathLunarLeap: form.lunarLeap }
-        : editing?.deathLunarDay
-          ? { deathLunarDay: null, deathLunarMonth: null, deathLunarLeap: false }
-          : {}),
+      ...deathBody(),
       ...(form.burialPlace.trim()
         ? { burialPlace: form.burialPlace.trim() }
         : editing?.burialPlace
@@ -163,8 +207,8 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     if (!form.fullName.trim()) return setError("Nhập họ tên.");
     if (form.birthYear && !/^\d{4}$/.test(form.birthYear.trim()))
       return setError("Năm sinh gồm 4 số, VD 1958.");
-    if (form.lunarDeath.trim() && !parseLunar(form.lunarDeath))
-      return setError("Ngày mất âm lịch ghi dạng ngày/tháng, VD 15/8.");
+    const de = deathError();
+    if (de) return setError(de);
     if (!editing && persons.length > 0 && !form.relatedId)
       return setError("Chọn người có quan hệ với người mới.");
     if (dups.length > 0 && !dupOk)
@@ -231,21 +275,6 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     }
   }
 
-  /** Biết ngày mất dương lịch thì tự điền ngày giỗ âm (vẫn sửa tay được). */
-  function fillLunar(date: string) {
-    get<{ data?: { lunar?: { day: number; month: number; isLeap?: boolean } } }>(
-      `/genealogy/lunar/convert?date=${date}`,
-    )
-      .then((b) => {
-        const l = b?.data?.lunar;
-        if (l)
-          setForm((f) =>
-            f.lunarDeath.trim() ? f : { ...f, lunarDeath: `${l.day}/${l.month}`, lunarLeap: !!l.isLeap },
-          );
-      })
-      .catch(() => undefined);
-  }
-
   function startEdit(p: Person) {
     setEditing(p);
     setMsg(null);
@@ -255,15 +284,10 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
       fullName: p.fullName,
       gender: p.gender ?? "male",
       birthYear: year(p.dateOfBirth),
-      deathYear: year(p.dateOfDeath),
-      dateOfDeath: p.dateOfDeath && !p.deathYearOnly ? p.dateOfDeath.slice(0, 10) : "",
-      lunarDeath: p.deathLunarDay && p.deathLunarMonth ? `${p.deathLunarDay}/${p.deathLunarMonth}` : "",
-      lunarLeap: !!p.deathLunarLeap,
+      ...deathForm(p),
       burialPlace: p.burialPlace ?? "",
       branch: p.branch ?? "",
     });
-    if (p.dateOfDeath && !p.deathYearOnly && !(p.deathLunarDay && p.deathLunarMonth))
-      fillLunar(p.dateOfDeath.slice(0, 10));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -390,59 +414,59 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
               maxLength={4}
             />
           </label>
-          <label className="muted-text" style={{ flex: "1 1 120px" }}>
-            Năm mất (nếu đã mất)
+        </div>
+        <div className="muted-text" style={{ marginTop: 12 }}>
+          Ngày mất
+          <div className="ngay-mat">
+            <select
+              aria-label="Lịch"
+              value={form.deathCal}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, deathCal: e.target.value as "al" | "dl", deathDirty: true }))
+              }
+            >
+              <option value="al">ÂL</option>
+              <option value="dl">DL</option>
+            </select>
             <input
-              style={inputStyle}
-              value={form.deathYear}
+              value={form.deathText}
               onChange={(e) => {
                 const v = e.target.value;
-                // Sửa năm khác năm của ngày mất đã nhập thì bỏ ngày cũ, tránh lệch nhau.
-                setForm((f) => ({ ...f, deathYear: v, dateOfDeath: v && f.dateOfDeath.startsWith(v) ? f.dateOfDeath : "" }));
+                setForm((f) => ({ ...f, deathText: v, deceased: f.deceased || !!v.trim(), deathDirty: true }));
               }}
-              placeholder="VD: 1985"
+              placeholder="ngày/tháng/năm hoặc năm"
               inputMode="numeric"
-              maxLength={4}
+              maxLength={10}
             />
-          </label>
-          <label className="muted-text" style={{ flex: "1 1 160px" }}>
-            Ngày mất dương lịch (nếu biết)
-            <input
-              style={inputStyle}
-              type="date"
-              value={form.dateOfDeath}
-              onChange={(e) => {
-                const v = e.target.value;
-                setForm((f) => ({ ...f, dateOfDeath: v, ...(v ? { deathYear: v.slice(0, 4) } : {}) }));
-                if (v && !form.lunarDeath.trim()) fillLunar(v);
-              }}
-            />
-          </label>
+            {form.deathCal === "al" && form.deathText.includes("/") && (
+              <span className="chk">
+                <input
+                  type="checkbox"
+                  checked={form.lunarLeap}
+                  onChange={(e) => setForm((f) => ({ ...f, lunarLeap: e.target.checked, deathDirty: true }))}
+                />
+                Nhuận
+              </span>
+            )}
+            <span className="chk">
+              <input
+                type="checkbox"
+                checked={form.deceased}
+                onChange={(e) =>
+                  setForm((f) =>
+                    e.target.checked
+                      ? { ...f, deceased: true, deathDirty: true }
+                      : { ...f, deceased: false, deathText: "", lunarLeap: false, deathDirty: true },
+                  )
+                }
+              />
+              Đã mất
+            </span>
+          </div>
         </div>
-        <div className="btn-row" style={{ flexWrap: "wrap", gap: 12, marginTop: 12, alignItems: "flex-end" }}>
-          <label className="muted-text" style={{ flex: "1 1 160px" }}>
-            Ngày giỗ (âm lịch), VD 15/8
-            <input
-              style={inputStyle}
-              value={form.lunarDeath}
-              onChange={(e) => set("lunarDeath")(e.target.value)}
-              placeholder="ngày/tháng"
-              inputMode="numeric"
-              maxLength={5}
-            />
-          </label>
-          <label className="muted-text" style={{ display: "flex", gap: 8, alignItems: "center", paddingBottom: 10 }}>
-            <input
-              type="checkbox"
-              checked={form.lunarLeap}
-              onChange={(e) => setForm((f) => ({ ...f, lunarLeap: e.target.checked }))}
-            />
-            Tháng nhuận
-          </label>
-        </div>
-        {(form.deathYear.trim() || form.dateOfDeath || form.lunarDeath.trim()) && (
+        {form.deceased && (
           <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
-            Phần mộ ở đâu (ghi chú: nghĩa trang, khu, hàng, lối vào…)
+            Phần mộ ở đâu
             <textarea
               style={{ ...inputStyle, minHeight: 64, resize: "vertical" }}
               value={form.burialPlace}

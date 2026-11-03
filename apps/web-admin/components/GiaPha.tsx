@@ -16,7 +16,7 @@ import { canManageLineage, roleLabel } from "@/lib/roles";
 import BieuTuong from "@/components/BieuTuong";
 import HoSoNguoi from "@/components/HoSoNguoi";
 import GioSapToi from "@/components/GioSapToi";
-import CayNhanh, { CayRelationship } from "@/components/CayNhanh";
+import CayNhanh, { CayRelationship, daMat } from "@/components/CayNhanh";
 import SoDoCay from "@/components/SoDoCay";
 
 interface TreePerson {
@@ -26,6 +26,8 @@ interface TreePerson {
   gender?: string | null;
   dateOfBirth?: string | null;
   dateOfDeath?: string | null;
+  deathLunarDay?: number | null;
+  isDeceased?: boolean;
   generation?: number | null;
   branch?: string | null;
   roleInLineage?: string | null;
@@ -393,7 +395,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
                 .map((p) => (
                   <button key={p.id} className="list-item" onClick={() => setOpenId(p.id)}>
                     <span
-                      className={`avatar${p.gender === "female" ? " female" : ""}${p.dateOfDeath ? " dead" : ""}`}
+                      className={`avatar${p.gender === "female" ? " female" : ""}${daMat(p) ? " dead" : ""}`}
                     >
                       {p.fullName.trim().split(/\s+/).pop()?.[0] ?? "?"}
                     </span>
@@ -409,7 +411,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
                           .join(" · ") || "—"}
                       </span>
                     </span>
-                    {p.dateOfDeath && <span className="badge warm">Đã mất</span>}
+                    {daMat(p) && <span className="badge warm">Đã mất</span>}
                   </button>
                 ))}
             </div>

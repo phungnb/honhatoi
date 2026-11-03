@@ -153,7 +153,7 @@ export class GenealogyService {
     for (const f of SENSITIVE_FIELDS) delete copy[f];
     // Hồ sơ trẻ em: ẩn ngày/tháng sinh, chỉ giữ năm.
     const dob = copy['dateOfBirth'];
-    if (dob && !copy['dateOfDeath']) {
+    if (dob && !copy['dateOfDeath'] && !copy['isDeceased'] && !copy['deathLunarDay']) {
       const d = new Date(dob as string | Date);
       const ageMs = Date.now() - d.getTime();
       if (ageMs < CHILD_AGE * 365.25 * 86400000) {
@@ -220,6 +220,7 @@ export class GenealogyService {
       'gender',
       'birthYearOnly',
       'deathYearOnly',
+      'isDeceased',
       'hometown',
       'currentPlace',
       'phone',
@@ -1639,7 +1640,7 @@ export class GenealogyService {
         dod: p.deathYearOnly && p.dateOfDeath
           ? `Năm ${new Date(p.dateOfDeath as Date).getFullYear()}`
           : fmtDate(p.dateOfDeath as Date | null),
-        status: p.dateOfDeath ? 'Đã mất' : 'Đang sống',
+        status: p.dateOfDeath || p.isDeceased || p.deathLunarDay ? 'Đã mất' : 'Đang sống',
         hometown: p.hometown ?? '',
         burialPlace: p.burialPlace ?? '',
         branch: p.branch ?? '',
@@ -1913,7 +1914,7 @@ export class GenealogyService {
     const person = await this.getPersonOrThrow(personId);
     const perm = await this.effectivePerm(person.lineageId, userId);
     this.require(perm, 'canPropose', 'nhận hồ sơ');
-    if (person.dateOfDeath)
+    if (person.dateOfDeath || person.isDeceased || person.deathLunarDay)
       throw new BadRequestException({
         code: 'PERSON_DECEASED',
         message: 'Không thể gắn tài khoản với hồ sơ người đã mất',

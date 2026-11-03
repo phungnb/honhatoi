@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as RPointerEvent } from "react";
-import { CayPerson, CayRelationship, dungCay, years } from "@/components/CayNhanh";
+import { CayPerson, CayRelationship, daMat, dungCay, years } from "@/components/CayNhanh";
 
 const W = 156; // rộng một khung người
 const H = 72; // cao một khung người
@@ -343,7 +343,7 @@ export default function SoDoCay({
     const sub = [spouse && spouse !== "Vợ/chồng" ? spouse : null, years(p), p.roleInLineage]
       .filter(Boolean)
       .join(" · ") || (spouse ?? "");
-    const dead = p.dateOfDeath || p.deathLunarDay;
+    const dead = daMat(p);
     return (
       <button
         key={id}

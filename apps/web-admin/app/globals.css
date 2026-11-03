@@ -1705,3 +1705,13 @@ blockquote.trich-dan {
   border: 1px dashed var(--border);
   border-radius: 12px;
 }
+
+/* Ô "Ngày mất" gộp: chọn ÂL/DL + ngày + tick */
+.ngay-mat { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.ngay-mat select, .ngay-mat input:not([type="checkbox"]) {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 10px;
+}
+.ngay-mat select { width: auto; }
+.ngay-mat input:not([type="checkbox"]) { flex: 1 1 160px; min-width: 0; }
+.ngay-mat .chk { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }

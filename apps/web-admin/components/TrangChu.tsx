@@ -40,6 +40,8 @@ interface TreePerson {
   dateOfBirth?: string | null;
   birthYearOnly?: boolean;
   dateOfDeath?: string | null;
+  deathLunarDay?: number | null;
+  isDeceased?: boolean;
   branch?: string | null;
 }
 
@@ -122,7 +124,7 @@ function buildUpcoming(anns: Anniversary[], persons: TreePerson[], events: Event
     });
   }
   for (const p of persons) {
-    if (!p.dateOfBirth || p.birthYearOnly || p.dateOfDeath) continue;
+    if (!p.dateOfBirth || p.birthYearOnly || p.dateOfDeath || p.isDeceased || p.deathLunarDay) continue;
     const [by, bm, bd] = p.dateOfBirth.slice(0, 10).split("-").map(Number);
     let next = new Date(today.getFullYear(), bm - 1, bd);
     if (next < today) next = new Date(today.getFullYear() + 1, bm - 1, bd);
