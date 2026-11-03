@@ -2,7 +2,7 @@
 
 /**
  * /quan-ly — cổng duy nhất cho người quản lý dòng họ. Liệt kê các họ mà
- * bạn là Người giữ gia phả / Ban quản trị / Trưởng tộc; chỉ có một họ thì
+ * bạn là Người giữ gia phả / Ban quản trị / Chủ gia phả; chỉ có một họ thì
  * vào thẳng họ đó.
  */
 

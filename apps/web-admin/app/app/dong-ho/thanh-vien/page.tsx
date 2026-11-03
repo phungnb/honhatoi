@@ -18,6 +18,7 @@ interface Member {
   userId: string;
   role?: string;
   isOwner?: boolean;
+  title?: string | null;
   joinedAt?: string | null;
   user: { id: string; displayName: string };
 }
@@ -110,6 +111,7 @@ export default function ThanhVienPage() {
                 <strong>{m.user.displayName}</strong>
                 {m.userId === me && <span className="muted-text"> (bạn)</span>}
                 <span className="muted-text" style={{ display: "block" }}>
+                  {m.title && <span className="pill warm" style={{ marginRight: 6 }}>{m.title}</span>}
                   {roleLabel(m.role, m.isOwner)}
                 </span>
               </span>

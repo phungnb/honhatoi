@@ -137,7 +137,7 @@ export default function Sidebar() {
 
         <div className="sidebar-foot">
           Một tài khoản cho mọi vai trò: Thành viên, Người giữ gia phả, Ban
-          quản trị, Trưởng tộc.
+          quản trị, Chủ gia phả.
           <div style={{ marginTop: 8 }}>
             <Link href="/dieu-khoan">Điều khoản</Link> · <Link href="/quyen-rieng-tu">Quyền riêng tư</Link>
           </div>

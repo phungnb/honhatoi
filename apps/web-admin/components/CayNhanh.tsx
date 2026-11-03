@@ -14,6 +14,7 @@ export interface CayPerson {
   gender?: string | null;
   dateOfBirth?: string | null;
   dateOfDeath?: string | null;
+  deathLunarDay?: number | null;
   generation?: number | null;
   roleInLineage?: string | null;
 }
@@ -22,6 +23,8 @@ export interface CayRelationship {
   personId: string;
   relatedPersonId: string;
   relationshipType: string;
+  startDate?: string | null;
+  createdAt?: string | null;
 }
 
 const year = (iso?: string | null) => (iso ? iso.slice(0, 4) : "");
@@ -51,7 +54,10 @@ export function dungCay(
     if (!a.includes(v)) a.push(v);
     m.set(k, a);
   };
-  for (const r of relationships) {
+  // Vợ/chồng xếp theo ngày cưới, không có thì theo thứ tự nhập: vợ cả trước, vợ hai sau.
+  const when = (r: CayRelationship) => r.startDate ?? r.createdAt ?? "";
+  const ordered = [...relationships].sort((a, b) => when(a).localeCompare(when(b)));
+  for (const r of ordered) {
     if (!byId.has(r.personId) || !byId.has(r.relatedPersonId)) continue;
     // (A, B, 'parent'): A là cha/mẹ của B. Bản ghi chiều ngược 'child' cho cùng kết quả.
     if (r.relationshipType === "parent") {
@@ -92,7 +98,7 @@ export function dungCay(
     roots.push(id);
     for (const s of sp) shownAsSpouse.add(s);
   }
-  return { byId, children, spouses, roots };
+  return { byId, children, parents, spouses, roots };
 }
 
 export default function CayNhanh({

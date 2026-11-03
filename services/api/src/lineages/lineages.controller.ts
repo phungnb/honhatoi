@@ -13,7 +13,7 @@ import { LineagesService } from './lineages.service';
 import { CreateLineageDto } from './dto/create-lineage.dto';
 import { UpdateLineageDto } from './dto/update-lineage.dto';
 import { JoinRequestDto } from './dto/join-request.dto';
-import { ChangeMemberRoleDto } from './dto/change-member-role.dto';
+import { ChangeMemberRoleDto, SetMemberTitleDto } from './dto/change-member-role.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { JoinByCodeDto } from './dto/join-by-code.dto';
 import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
@@ -151,6 +151,17 @@ export class LineagesController {
     @Body() dto: ChangeMemberRoleDto,
   ) {
     return this.lineages.changeRole(lineageId, adminId, targetUserId, dto.role);
+  }
+
+  @Patch(':lineageId/members/:userId/title')
+  @UseGuards(LineageGuard)
+  setTitle(
+    @Param('lineageId') lineageId: string,
+    @Param('userId') targetUserId: string,
+    @CurrentUserId() adminId: string,
+    @Body() dto: SetMemberTitleDto,
+  ) {
+    return this.lineages.setMemberTitle(lineageId, adminId, targetUserId, dto.title ?? null);
   }
 
   @Post(':lineageId/transfer-ownership')

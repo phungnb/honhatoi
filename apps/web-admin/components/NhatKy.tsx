@@ -23,7 +23,7 @@ const ACTION: Record<string, string> = {
   "lineage.member.approve": "duyệt thành viên vào họ",
   "lineage.member.join_by_code": "vào họ bằng mã mời",
   "lineage.member.remove": "mời thành viên rời họ",
-  "lineage.owner.transfer": "chuyển quyền Trưởng tộc",
+  "lineage.owner.transfer": "chuyển quyền Chủ gia phả",
   "genealogy.person.create": "thêm người vào cây",
   "genealogy.person.update": "sửa hồ sơ",
   "genealogy.person.delete": "xóa người khỏi cây",

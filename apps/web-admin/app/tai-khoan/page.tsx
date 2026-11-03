@@ -2,7 +2,7 @@
 
 /**
  * Tài khoản — đổi số điện thoại mà vẫn giữ nguyên tài khoản (vai trò
- * Trưởng tộc, quyền quản trị nền tảng, các dòng họ đã tham gia).
+ * Chủ gia phả, quyền quản trị nền tảng, các dòng họ đã tham gia).
  * Cần mã OTP gửi tới CẢ số cũ lẫn số mới; mất số cũ thì nhờ quản trị
  * nền tảng đổi hộ.
  */
@@ -139,7 +139,7 @@ export default function TaiKhoanPage() {
         <p className="page-desc">
           Số điện thoại: <strong>{phone ?? "chưa có"}</strong> · Email:{" "}
           <strong>{email ?? "chưa có"}</strong>. Đổi số hay thêm email vẫn
-          giữ nguyên tài khoản: vai trò trong dòng họ, quyền Trưởng tộc và
+          giữ nguyên tài khoản: vai trò trong dòng họ, quyền Chủ gia phả và
           quyền quản trị đều đi theo.
         </p>
       </div>

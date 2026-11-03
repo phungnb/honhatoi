@@ -324,7 +324,7 @@ export class AuthService {
    * nên giữ nguyên, chỉ gỡ liên kết tài khoản. Tin nhắn đã gửi giữ nội dung
    * nhưng tên người gửi thành "Người dùng đã xóa".
    *
-   * Đang là Trưởng tộc của dòng họ còn thành viên khác thì phải chuyển quyền
+   * Đang là Chủ gia phả của dòng họ còn thành viên khác thì phải chuyển quyền
    * trước; dòng họ chỉ có một mình thì xóa luôn dòng họ.
    */
   async deleteMe(userId: string) {
@@ -344,9 +344,9 @@ export class AuthService {
     if (blocking.length)
       throw new ConflictException({
         code: 'OWNS_LINEAGE',
-        message: `Bạn đang là Trưởng tộc của ${blocking
+        message: `Bạn đang là Chủ gia phả của ${blocking
           .map((l) => l.name)
-          .join(', ')}. Hãy chuyển quyền Trưởng tộc cho người khác trước khi xóa tài khoản.`,
+          .join(', ')}. Hãy chuyển quyền Chủ gia phả cho người khác trước khi xóa tài khoản.`,
       });
 
     const now = new Date();
@@ -450,7 +450,7 @@ export class AuthService {
 
   /**
    * POST /auth/phone/change/request — gửi mã tới CẢ số cũ lẫn số mới.
-   * Đổi số giữ nguyên tài khoản (user id), nên vai trò Trưởng tộc, quyền
+   * Đổi số giữ nguyên tài khoản (user id), nên vai trò Chủ gia phả, quyền
    * quản trị nền tảng, dòng họ đã tham gia đều đi theo.
    */
   async requestPhoneChange(userId: string, dto: RequestPhoneChangeDto) {

@@ -25,6 +25,10 @@ interface Node {
   id: string; // người trong họ (người có cha mẹ trong cây hoặc người gốc)
   spouses: string[];
   kids: Node[];
+  /** Con này là con chung với vợ/chồng thứ mấy của cha/mẹ (-1: chưa rõ). */
+  via: number;
+  /** Thuộc nhánh con gái (nhánh ngoại): con cháu của một người nữ trong họ. */
+  ngoai: boolean;
   hidden: number; // số con bị gập
   depth: number;
   width: number; // bề rộng cả nhánh
@@ -33,7 +37,30 @@ interface Node {
 }
 
 const unitW = (n: Node) => W * (1 + n.spouses.length) + GAP_SPOUSE * n.spouses.length;
+const SLOT = W + GAP_SPOUSE;
 
+/**
+ * Vị trí các khung trong một đơn vị gia đình (tính từ mép trái, theo ô).
+ * Một vợ/chồng: [người][vợ]. Từ hai vợ/chồng trở lên: [vợ 1][người][vợ 2][vợ 3]…
+ * để con của vợ 1 đứng bên trái, con của vợ 2 bên phải, không cắt chéo nhau.
+ */
+function slots(n: Node): { main: number; sp: number[] } {
+  if (n.spouses.length < 2) return { main: 0, sp: n.spouses.map((_, i) => i + 1) };
+  return { main: 1, sp: n.spouses.map((_, i) => (i === 0 ? 0 : i + 1)) };
+}
+
+/** Điểm xuất phát đường xuống con của từng nhóm: giữa đôi vợ chồng, hoặc dưới khung người. */
+function junction(n: Node, via: number): { x: number; y: number } {
+  const { main, sp } = slots(n);
+  const mainX = n.x + main * SLOT;
+  if (via < 0 || via >= n.spouses.length) {
+    if (n.spouses.length === 1) return { x: mainX + W + GAP_SPOUSE / 2, y: n.y + H / 2 };
+    return { x: mainX + W / 2, y: n.y + H };
+  }
+  const sx = n.x + sp[via] * SLOT;
+  if (Math.abs(sp[via] - main) === 1) return { x: (Math.min(sx, mainX) + W + Math.max(sx, mainX)) / 2, y: n.y + H / 2 };
+  return { x: sx + W / 2, y: n.y + H };
+}
 export default function SoDoCay({
   persons,
   relationships,
@@ -45,7 +72,7 @@ export default function SoDoCay({
   rootId?: string | null;
   onOpen: (id: string) => void;
 }) {
-  const { byId, children, spouses, roots } = useMemo(
+  const { byId, children, parents, spouses, roots } = useMemo(
     () => dungCay(persons, relationships, rootId),
     [persons, relationships, rootId],
   );
@@ -56,7 +83,7 @@ export default function SoDoCay({
 
   const layout = useMemo(() => {
     const drawn = new Set<string>();
-    const build = (id: string, depth: number): Node | null => {
+    const build = (id: string, depth: number, via: number, ngoai: boolean): Node | null => {
       if (drawn.has(id)) return null;
       drawn.add(id);
       const sp = (spouses.get(id) ?? []).filter((s) => !drawn.has(s));
@@ -64,18 +91,32 @@ export default function SoDoCay({
       const kidIds = Array.from(
         new Set([...(children.get(id) ?? []), ...sp.flatMap((s) => children.get(s) ?? [])]),
       ).filter((k) => !drawn.has(k));
-      const node: Node = { id, spouses: sp, kids: [], hidden: 0, depth, width: 0, x: 0, y: 0 };
+      // Nhóm con theo người mẹ/cha còn lại: một vợ/chồng thì gộp chung; từ hai
+      // trở lên thì con vợ 1 trước, con chưa rõ mẹ/cha ở giữa, rồi vợ 2, vợ 3…
+      const viaOf = (k: string) => {
+        if (sp.length < 2) return sp.length ? 0 : -1;
+        const ps = parents.get(k) ?? [];
+        return sp.findIndex((s) => ps.includes(s));
+      };
+      const rank = (v: number) => (v === 0 ? 0 : v < 0 ? 1 : v + 1);
+      const grouped = kidIds
+        .map((k, i) => ({ k, v: viaOf(k), i }))
+        .sort((a, b) => rank(a.v) - rank(b.v) || a.i - b.i);
+      const female = byId.get(id)?.gender === "female";
+      // Con của người nữ trong họ (không phải người gốc) là nhánh ngoại.
+      const kidsNgoai = ngoai || (female && depth > 0);
+      const node: Node = { id, spouses: sp, kids: [], via, ngoai, hidden: 0, depth, width: 0, x: 0, y: 0 };
       if (closed.has(id)) {
         node.hidden = kidIds.length;
       } else {
-        for (const k of kidIds) {
-          const c = build(k, depth + 1);
+        for (const g of grouped) {
+          const c = build(g.k, depth + 1, g.v, kidsNgoai);
           if (c) node.kids.push(c);
         }
       }
       return node;
     };
-    const tops = roots.map((r) => build(r, 0)).filter((n): n is Node => !!n);
+    const tops = roots.map((r) => build(r, 0, -1, false)).filter((n): n is Node => !!n);
 
     const measure = (n: Node): number => {
       const kidsW = n.kids.reduce((s, k) => s + measure(k), 0) + GAP_X * Math.max(0, n.kids.length - 1);
@@ -111,15 +152,36 @@ export default function SoDoCay({
       width: Math.max(0, left - GAP_X * 2) + PAD * 2,
       height: (maxDepth + 1) * (H + GAP_Y) - GAP_Y + PAD * 2 + 28,
     };
-  }, [children, spouses, roots, closed]);
+  }, [byId, children, parents, spouses, roots, closed]);
+
+  // Con gái trong họ có con: mặc định gập nhánh ngoại cho cây gọn, vẫn hiện
+  // số con cháu trên nút "+N nhánh ngoại" để bấm mở.
+  const ngoaiRoots = useMemo(() => {
+    const out = new Set<string>();
+    for (const p of persons) {
+      if (p.gender !== "female" || !(parents.get(p.id)?.length ?? 0)) continue;
+      const kids = [...(children.get(p.id) ?? []), ...(spouses.get(p.id) ?? []).flatMap((s) => children.get(s) ?? [])];
+      if (kids.length) out.add(p.id);
+    }
+    return out;
+  }, [persons, parents, children, spouses]);
+  const ngoaiOpen = Array.from(ngoaiRoots).some((id) => !closed.has(id));
 
   useEffect(() => {
-    if (autoClosed || persons.length <= 60) return;
-    const deep = new Set<string>();
-    for (const n of layout.nodes) if (n.depth === 3 && n.kids.length) deep.add(n.id);
+    if (autoClosed || !persons.length) return;
+    const init = new Set<string>(ngoaiRoots);
+    if (persons.length > 60) for (const n of layout.nodes) if (n.depth === 3 && n.kids.length) init.add(n.id);
     setAutoClosed(true);
-    if (deep.size) setClosed(deep);
-  }, [autoClosed, persons.length, layout.nodes]);
+    if (init.size) setClosed(init);
+  }, [autoClosed, persons.length, layout.nodes, ngoaiRoots]);
+
+  function toggleNgoai() {
+    setClosed((prev) => {
+      const next = new Set(prev);
+      ngoaiRoots.forEach((id) => (ngoaiOpen ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  }
 
   // ---- Thu phóng và kéo ----
   const viewRef = useRef<HTMLDivElement>(null);
@@ -243,31 +305,51 @@ export default function SoDoCay({
   const lines: string[] = [];
   for (const n of layout.nodes) {
     if (!n.kids.length) continue;
-    // Có vợ/chồng thì đường xuất phát từ giữa đôi, không thì từ giữa khung người.
-    const fromX = PAD + (n.spouses.length ? n.x + W + GAP_SPOUSE / 2 : n.x + W / 2);
-    const fromY = PAD + n.y + (n.spouses.length ? H / 2 : H);
-    const midY = PAD + n.y + H + GAP_Y / 2;
-    lines.push(`M${fromX},${fromY}V${midY}`);
-    const xs = n.kids.map((k) => PAD + k.x + W / 2);
-    lines.push(`M${Math.min(fromX, ...xs)},${midY}H${Math.max(fromX, ...xs)}`);
-    for (const x of xs) lines.push(`M${x},${midY}V${PAD + n.y + H + GAP_Y}`);
+    // Mỗi nhóm con (theo vợ/chồng) có đường riêng, hạ thấp dần để không chồng lên nhau.
+    const groups = new Map<number, Node[]>();
+    for (const k of n.kids) groups.set(k.via, [...(groups.get(k.via) ?? []), k]);
+    let gi = 0;
+    for (const [via, kids] of Array.from(groups.entries())) {
+      const j = junction(n, via);
+      const fromX = PAD + j.x;
+      const midY = PAD + n.y + H + GAP_Y / 2 + (groups.size > 1 ? (gi - (groups.size - 1) / 2) * 8 : 0);
+      lines.push(`M${fromX},${PAD + j.y}V${midY}`);
+      const xs = kids.map((k) => PAD + k.x + (slots(k).main * SLOT) + W / 2);
+      lines.push(`M${Math.min(fromX, ...xs)},${midY}H${Math.max(fromX, ...xs)}`);
+      for (const x of xs) lines.push(`M${x},${midY}V${PAD + n.y + H + GAP_Y}`);
+      gi++;
+    }
   }
   for (const n of layout.nodes) {
     if (!n.spouses.length) continue;
+    const { main, sp } = slots(n);
     const y = PAD + n.y + H / 2;
-    lines.push(`M${PAD + n.x + W},${y}H${PAD + n.x + W + GAP_SPOUSE}`);
+    const mx = PAD + n.x + main * SLOT;
+    sp.forEach((slot, i) => {
+      const sx = PAD + n.x + slot * SLOT;
+      if (Math.abs(slot - main) === 1) {
+        lines.push(`M${Math.min(sx, mx) + W},${y}H${Math.max(sx, mx)}`);
+      } else {
+        // Vợ/chồng không đứng sát: nối vòng phía trên các khung.
+        const top = PAD + n.y - 8 - i * 4;
+        lines.push(`M${mx + W / 2},${PAD + n.y}V${top}H${sx + W / 2}V${PAD + n.y}`);
+      }
+    });
   }
 
-  const box = (id: string, x: number, y: number, spouse: boolean) => {
+  const box = (id: string, x: number, y: number, spouse: string | null, ngoai: boolean) => {
     const p = byId.get(id);
     if (!p) return null;
-    const sub = [years(p), p.roleInLineage].filter(Boolean).join(" · ") || (spouse ? "Vợ/chồng" : "");
+    const sub = [spouse && spouse !== "Vợ/chồng" ? spouse : null, years(p), p.roleInLineage]
+      .filter(Boolean)
+      .join(" · ") || (spouse ?? "");
+    const dead = p.dateOfDeath || p.deathLunarDay;
     return (
       <button
         key={id}
-        className={`sd-box${p.gender === "female" ? " female" : ""}${p.dateOfDeath ? " dead" : ""}${
+        className={`sd-box${p.gender === "female" ? " female" : ""}${dead ? " dead" : ""}${
           spouse ? " spouse" : ""
-        }${id === rootId ? " root" : ""}`}
+        }${ngoai ? " ngoai" : ""}${id === rootId ? " root" : ""}`}
         style={{ left: PAD + x, top: PAD + y, width: W, height: H }}
         onClick={() => open(id)}
       >
@@ -275,6 +357,13 @@ export default function SoDoCay({
         {sub && <span className="sub">{sub}</span>}
       </button>
     );
+  };
+
+  /** Nhãn vợ/chồng: "Vợ 1", "Vợ 2" khi có nhiều hơn một. */
+  const spouseLabel = (n: Node, i: number) => {
+    const g = byId.get(n.spouses[i])?.gender;
+    const w = g === "female" ? "Vợ" : g === "male" ? "Chồng" : "Vợ/chồng";
+    return n.spouses.length > 1 ? `${w} ${i + 1}` : "Vợ/chồng";
   };
 
   return (
@@ -298,25 +387,27 @@ export default function SoDoCay({
           <svg width={layout.width} height={layout.height} className="sd-lines" aria-hidden>
             <path d={lines.join("")} />
           </svg>
-          {layout.nodes.map((n) => (
-            <div key={n.id}>
-              {box(n.id, n.x, n.y, false)}
-              {n.spouses.map((s, i) => box(s, n.x + (W + GAP_SPOUSE) * (i + 1), n.y, true))}
-              {(n.kids.length > 0 || n.hidden > 0) && (
-                <button
-                  className="sd-fold"
-                  style={{
-                    left: PAD + (n.spouses.length ? n.x + W + GAP_SPOUSE / 2 : n.x + W / 2) - 15,
-                    top: PAD + n.y + H + 6,
-                  }}
-                  aria-label={n.hidden ? `Mở nhánh, ${n.hidden} con` : "Gập nhánh"}
-                  onClick={() => toggle(n.id)}
-                >
-                  {n.hidden ? `+${n.hidden}` : "−"}
-                </button>
-              )}
-            </div>
-          ))}
+          {layout.nodes.map((n) => {
+            const { main, sp } = slots(n);
+            const female = byId.get(n.id)?.gender === "female";
+            const fx = n.x + main * SLOT + W / 2;
+            return (
+              <div key={n.id}>
+                {box(n.id, n.x + main * SLOT, n.y, null, n.ngoai)}
+                {n.spouses.map((s, i) => box(s, n.x + sp[i] * SLOT, n.y, spouseLabel(n, i), n.ngoai))}
+                {(n.kids.length > 0 || n.hidden > 0) && (
+                  <button
+                    className={`sd-fold${n.hidden && female && n.depth > 0 ? " ngoai" : ""}`}
+                    style={{ left: PAD + fx, top: PAD + n.y + H + 6, transform: "translateX(-50%)" }}
+                    aria-label={n.hidden ? `Mở nhánh, ${n.hidden} con` : "Gập nhánh"}
+                    onClick={() => toggle(n.id)}
+                  >
+                    {n.hidden ? (female && n.depth > 0 ? `+${n.hidden} nhánh ngoại` : `+${n.hidden}`) : "−"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="sd-tools">
@@ -326,12 +417,18 @@ export default function SoDoCay({
         <button className="btn" onClick={() => zoomCenter(0.8)} aria-label="Thu nhỏ">
           −
         </button>
+        {ngoaiRoots.size > 0 && (
+          <button className="btn" onClick={toggleNgoai}>
+            {ngoaiOpen ? "Gập nhánh ngoại" : "Mở nhánh ngoại"}
+          </button>
+        )}
         <button className="btn" onClick={fit}>
           Xem toàn bộ
         </button>
       </div>
       <p className="muted-text sd-hint">
-        Kéo để di chuyển, chụm hai ngón để phóng to/thu nhỏ. Bấm vào tên để xem hồ sơ.
+        Kéo để di chuyển, chụm hai ngón để phóng to/thu nhỏ. Bấm vào tên để xem hồ sơ. Khung viền
+        đứt nét màu cam là con cháu nhánh ngoại (con của con gái trong họ).
       </p>
     </div>
   );

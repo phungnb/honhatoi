@@ -79,3 +79,24 @@ test('cháu họ, và nhánh quá xa thì không xưng bừa', () => {
   assert.equal(title('bo', 'anhHung'), 'Cháu họ');
   assert.equal(title('beNa', 'chauHung'), null);
 });
+
+test('xưng theo miền: Bắc/Nam và vợ/chồng của cô chú', () => {
+  // Chồng cô Ba, vợ bố (mẹ), chị gái lớn của bố (Bác gái ở Bắc, Cô ở Nam).
+  const more = [P('duong', 'male', 1972), P('me', 'female', 1972), P('coCa', 'female', 1965)];
+  const sp = (a: string, b: string): KinshipRelation[] => [
+    { personId: a, relatedPersonId: b, relationshipType: 'spouse' },
+    { personId: b, relatedPersonId: a, relationshipType: 'spouse' },
+  ];
+  const ps = [...persons, ...more];
+  const rs = [...rels, ...sp('coBa', 'duong'), ...sp('bo', 'me'), ...parent('me', 'toi'), ...parent('ongUt', 'coCa')];
+  const t = (to: string, mien?: 'bac' | 'nam') => findKinship('toi', to, ps, rs, mien)?.title;
+  assert.equal(t('bo', 'bac'), 'Bố');
+  assert.equal(t('bo', 'nam'), 'Ba');
+  assert.equal(t('me', 'nam'), 'Má');
+  assert.equal(t('coCa', 'bac'), 'Bác');
+  assert.equal(t('coCa', 'nam'), 'Cô');
+  assert.equal(t('duong', 'bac'), 'Chú');
+  assert.equal(t('duong', 'nam'), 'Dượng');
+  // Không chọn miền: giữ cách cũ.
+  assert.equal(t('bo'), 'Cha');
+});

@@ -26,8 +26,8 @@ export default function DieuKhoanPage() {
       <h2>3. Dòng họ và vai trò</h2>
       <ul>
         <li>
-          Người tạo dòng họ là Trưởng tộc, chịu trách nhiệm duyệt thành viên và
-          phân vai trò. Trưởng tộc muốn xóa tài khoản phải chuyển quyền cho
+          Người tạo dòng họ là Chủ gia phả, chịu trách nhiệm duyệt thành viên và
+          phân vai trò. Chủ gia phả muốn xóa tài khoản phải chuyển quyền cho
           người khác trước.
         </li>
         <li>

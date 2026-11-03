@@ -20,8 +20,8 @@ import { UpdateLineageDto } from './dto/update-lineage.dto';
  *
  * - Mọi thao tác đọc/ghi đều gắn lineageId cụ thể; LineageGuard đảm bảo user là
  *   thành viên được duyệt (cô lập dữ liệu giữa các họ — HNT-T-010).
- * - 3 vai trò (MEMBER, EDITOR, ADMIN) + Trưởng tộc (lineages.owner_user_id),
- *   kiểm tra qua can() trong common/permissions.ts. Trưởng tộc luôn tồn tại
+ * - 3 vai trò (MEMBER, EDITOR, ADMIN) + Chủ gia phả (lineages.owner_user_id),
+ *   kiểm tra qua can() trong common/permissions.ts. Chủ gia phả luôn tồn tại
  *   đúng một người mỗi họ: không bị xóa/hạ, muốn rời phải chuyển giao trước.
  */
 
@@ -50,7 +50,7 @@ export class LineagesService {
     return m;
   }
 
-  /** Membership + vai trò hiệu lực (kèm cờ Trưởng tộc) của user trong họ. */
+  /** Membership + vai trò hiệu lực (kèm cờ Chủ gia phả) của user trong họ. */
   private async actorOrThrow(lineageId: string, userId: string) {
     const [m, lineage] = await Promise.all([
       this.membershipOrThrow(lineageId, userId),
@@ -77,7 +77,7 @@ export class LineagesService {
         code: 'REQUIRED_ROLE',
         message:
           action === 'owner'
-            ? 'Thao tác này chỉ Trưởng tộc (người sở hữu dòng họ) được làm'
+            ? 'Thao tác này chỉ Chủ gia phả (người sở hữu dòng họ) được làm'
             : 'Bạn không có quyền thực hiện thao tác này trong dòng họ',
       });
     return ctx;
@@ -112,7 +112,7 @@ export class LineagesService {
     throw new ForbiddenException({
       code: 'OWNER_PROTECTED',
       message:
-        'Không thể thay đổi hoặc xóa Trưởng tộc — Trưởng tộc cần chuyển giao quyền sở hữu trước',
+        'Không thể thay đổi hoặc xóa Chủ gia phả — Chủ gia phả cần chuyển giao quyền sở hữu trước',
     });
   }
 
@@ -139,7 +139,7 @@ export class LineagesService {
   // ---------------------------------------------------------------- create
 
   /**
-   * POST /lineages — tạo dòng họ; người tạo thành ADMIN + Trưởng tộc
+   * POST /lineages — tạo dòng họ; người tạo thành ADMIN + Chủ gia phả
    * (ownerUserId), tất cả trong một transaction.
    */
   async create(userId: string, dto: CreateLineageDto) {
@@ -236,7 +236,7 @@ export class LineagesService {
   }
 
   /**
-   * DELETE /lineages/:id — chỉ Trưởng tộc; xóa mềm.
+   * DELETE /lineages/:id — chỉ Chủ gia phả; xóa mềm.
    * Còn hồ sơ gia phả → 422 (bảo toàn dữ liệu, FK RESTRICT).
    */
   async remove(lineageId: string, userId: string) {
@@ -290,6 +290,7 @@ export class LineagesService {
           userId: m.userId,
           role: m.role,
           isOwner: m.userId === lineage?.ownerUserId,
+          title: m.title,
           branch: m.requestedBranch,
           joinedAt: m.joinedAt,
           user: m.user,
@@ -352,7 +353,7 @@ export class LineagesService {
 
   /**
    * POST /lineages/:id/join-requests/:rid/approve|reject — Ban quản trị.
-   * Duyệt: gán MEMBER/EDITOR (gán ADMIN chỉ Trưởng tộc), ghi audit — trong
+   * Duyệt: gán MEMBER/EDITOR (gán ADMIN chỉ Chủ gia phả), ghi audit — trong
    * transaction. Quyền gia phả suy ra từ vai trò.
    */
   async reviewJoin(
@@ -403,7 +404,7 @@ export class LineagesService {
     if (newRole === LineageRole.ADMIN && !can(reviewer.actor, 'owner'))
       throw new ForbiddenException({
         code: 'ROLE_ESCALATION_FORBIDDEN',
-        message: 'Chỉ Trưởng tộc được gán vai trò Ban quản trị',
+        message: 'Chỉ Chủ gia phả được gán vai trò Ban quản trị',
       });
 
     const membership = await this.prisma.$transaction(async (tx) => {
@@ -434,8 +435,8 @@ export class LineagesService {
   /**
    * PATCH /lineages/:id/members/:userId/role — đổi vai trò.
    * - MEMBER ↔ EDITOR: Ban quản trị.
-   * - Cấp/thu ADMIN: chỉ Trưởng tộc.
-   * - Trưởng tộc không bị đổi vai trò (dùng chuyển quyền sở hữu).
+   * - Cấp/thu ADMIN: chỉ Chủ gia phả.
+   * - Chủ gia phả không bị đổi vai trò (dùng chuyển quyền sở hữu).
    */
   async changeRole(
     lineageId: string,
@@ -464,7 +465,7 @@ export class LineagesService {
     )
       throw new ForbiddenException({
         code: 'ROLE_ESCALATION_FORBIDDEN',
-        message: 'Chỉ Trưởng tộc được cấp hoặc thu vai trò Ban quản trị',
+        message: 'Chỉ Chủ gia phả được cấp hoặc thu vai trò Ban quản trị',
       });
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.genealogyPermission.deleteMany({
@@ -487,7 +488,43 @@ export class LineagesService {
   }
 
   /**
-   * POST /lineages/:id/transfer-ownership — Trưởng tộc chuyển quyền sở hữu
+   * PATCH /lineages/:id/members/:userId/title — gán chức danh trong họ
+   * (Trưởng tộc, Trưởng chi, Thủ từ…). Chức danh chỉ để hiển thị, không cấp
+   * quyền trong app; Ban quản trị trở lên gán được, kể cả cho chính mình.
+   */
+  async setMemberTitle(
+    lineageId: string,
+    adminId: string,
+    targetUserId: string,
+    title: string | null,
+  ) {
+    await this.requirePerm(lineageId, adminId, 'members.manage');
+    const target = await this.prisma.lineageMembership.findUnique({
+      where: { lineageId_userId: { lineageId, userId: targetUserId } },
+    });
+    if (!target || target.status !== 'approved')
+      throw new NotFoundException({
+        code: 'MEMBER_NOT_FOUND',
+        message: 'Không tìm thấy thành viên',
+      });
+    const clean = title?.trim() || null;
+    const updated = await this.prisma.lineageMembership.update({
+      where: { id: target.id },
+      data: { title: clean },
+    });
+    await this.audit(
+      lineageId,
+      adminId,
+      'lineage.member.title_change',
+      'lineage_membership',
+      target.id,
+      { userId: targetUserId, from: target.title, to: clean },
+    );
+    return { data: { membership: updated }, error: null };
+  }
+
+  /**
+   * POST /lineages/:id/transfer-ownership — Chủ gia phả chuyển quyền sở hữu
    * cho một thành viên khác. Người nhận thành ADMIN; người cũ giữ ADMIN.
    */
   async transferOwnership(
@@ -499,7 +536,7 @@ export class LineagesService {
     if (targetUserId === ownerId)
       throw new BadRequestException({
         code: 'ALREADY_OWNER',
-        message: 'Bạn đang là Trưởng tộc',
+        message: 'Bạn đang là Chủ gia phả',
       });
     const target = await this.prisma.lineageMembership.findUnique({
       where: { lineageId_userId: { lineageId, userId: targetUserId } },
@@ -534,7 +571,7 @@ export class LineagesService {
 
   /**
    * DELETE /lineages/:id/members/:userId — xóa thành viên (Ban quản trị).
-   * Không xóa được Trưởng tộc; xóa ADMIN cần Trưởng tộc; tự rời dùng /leave.
+   * Không xóa được Chủ gia phả; xóa ADMIN cần Chủ gia phả; tự rời dùng /leave.
    */
   async removeMember(lineageId: string, adminId: string, targetUserId: string) {
     const { actor, ownerUserId } = await this.requirePerm(
@@ -559,7 +596,7 @@ export class LineagesService {
     if (target.role === LineageRole.ADMIN && !can(actor, 'owner'))
       throw new ForbiddenException({
         code: 'TARGET_RANK_TOO_HIGH',
-        message: 'Chỉ Trưởng tộc được xóa thành viên Ban quản trị',
+        message: 'Chỉ Chủ gia phả được xóa thành viên Ban quản trị',
       });
     await this.prisma.$transaction(async (tx) => {
       await tx.lineageMembership.delete({ where: { id: target.id } });
@@ -595,7 +632,7 @@ export class LineagesService {
     if (lineage?.ownerUserId === userId)
       throw new ForbiddenException({
         code: 'OWNER_MUST_TRANSFER',
-        message: 'Bạn là Trưởng tộc — hãy chuyển quyền sở hữu trước khi rời họ',
+        message: 'Bạn là Chủ gia phả — hãy chuyển quyền sở hữu trước khi rời họ',
       });
     await this.prisma.$transaction(async (tx) => {
       await tx.lineageMembership.delete({ where: { id: membership.id } });

@@ -2,7 +2,7 @@
 
 /**
  * Bắt đầu — cho người chưa thuộc dòng họ nào: tạo dòng họ mới (trở thành
- * Trưởng tộc) hoặc vào họ bằng mã mời. Mã có thể đến từ link
+ * Chủ gia phả) hoặc vào họ bằng mã mời. Mã có thể đến từ link
  * /app?ma=XXXX mà Ban quản trị gửi qua Zalo.
  */
 
@@ -103,7 +103,7 @@ export default function BatDau({
       <div className="card section-gap" style={{ maxWidth: 560 }}>
         <h2 className="card-title">Vào dòng họ bằng mã mời</h2>
         <p className="muted-text">
-          Xin mã mời từ Trưởng tộc hoặc Ban quản trị dòng họ của bạn.
+          Xin mã mời từ Chủ gia phả hoặc Ban quản trị dòng họ của bạn.
         </p>
         <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
           Mã mời
@@ -128,7 +128,7 @@ export default function BatDau({
       <div className="card section-gap" style={{ maxWidth: 560 }}>
         <h2 className="card-title">Tạo dòng họ mới</h2>
         <p className="muted-text">
-          Bạn sẽ là Trưởng tộc: dựng cây gia phả, mời con cháu, phân người
+          Bạn sẽ là Chủ gia phả: dựng cây gia phả, mời con cháu, phân người
           giữ gia phả.
         </p>
         <label className="muted-text" style={{ display: "block", marginTop: 12 }}>

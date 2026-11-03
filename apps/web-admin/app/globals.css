@@ -1642,3 +1642,66 @@ blockquote.trich-dan {
 .card.row.hot {
   border-color: var(--warm-line);
 }
+
+/* Nhánh ngoại (con cháu của con gái trong họ) và người nhiều đời vợ/chồng */
+.sd-box.ngoai {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warm) 45%, var(--border));
+  border-top-style: solid;
+  background: color-mix(in srgb, var(--warm) 6%, var(--surface));
+}
+.sd-fold.ngoai {
+  border-color: color-mix(in srgb, var(--warm) 55%, var(--border));
+  color: var(--warm);
+  white-space: nowrap;
+}
+.sd-tools .btn:not(:nth-child(-n + 2)) {
+  font-size: 0.875rem;
+}
+
+/* ===== Lịch sử dòng họ ===== */
+.sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sec-head .sec-title {
+  margin: 0;
+}
+.lich-su-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.lich-su-form textarea.field {
+  resize: vertical;
+  min-height: 64px;
+}
+.lich-su-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.lich-su-note {
+  white-space: normal !important;
+}
+.lich-su-entry {
+  margin-bottom: 12px;
+}
+.mo-phan-gen {
+  padding: 10px 16px 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.xung-ho-rieng {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}

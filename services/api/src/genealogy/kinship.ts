@@ -43,6 +43,14 @@ export interface KinshipRelation {
 
 export type KinshipStep = 'up' | 'down' | 'across';
 
+/**
+ * Cách xưng theo miền. Không truyền = cách cũ (giữ tương thích). Khác biệt
+ * chính: miền Nam gọi cha mẹ là Ba/Má, anh chị của mẹ vẫn là Cậu/Dì, chị của
+ * cha vẫn là Cô (miền Bắc gọi chung anh chị của cha mẹ là Bác); chồng của
+ * cô/dì miền Bắc gọi Chú, miền Nam gọi Dượng.
+ */
+export type KinshipRegion = 'bac' | 'nam';
+
 export interface KinshipPathNode {
   personId: string;
   fullName: string;
@@ -126,6 +134,7 @@ export function findKinship(
   toId: string,
   persons: KinshipPerson[],
   relations: KinshipRelation[],
+  region?: KinshipRegion,
 ): KinshipResult | null {
   const byId = new Map(persons.map((p) => [p.id, p]));
   const from = byId.get(fromId);
@@ -186,7 +195,7 @@ export function findKinship(
   });
   const steps = edgeSteps;
 
-  const titleAndNote = titleForPath(steps, nodes, byId, graph, fromId);
+  const titleAndNote = titleForPath(steps, nodes, byId, graph, fromId, region);
   const sentence = titleAndNote.title
     ? `${to.fullName} là ${lowerFirst(titleAndNote.title)} của ${from.fullName}`
     : null;
@@ -204,6 +213,7 @@ function titleForPath(
   byId: Map<string, KinshipPerson>,
   graph: Map<string, StepEdge[]>,
   fromId: string,
+  region?: KinshipRegion,
 ): { title: string | null; note: string | null } {
   const personAt = (i: number) => byId.get(nodes[i].personId) as KinshipPerson;
   const from = personAt(0);
@@ -213,7 +223,11 @@ function titleForPath(
   // Chuỗi thuần lên: cha/mẹ → ông/bà → cụ → kỵ → tổ.
   if (steps.every((s) => s === 'up')) {
     const upTitles = ['', 'Cha/Mẹ', 'Ông/Bà', 'Cụ', 'Kỵ', 'Tổ'];
-    if (steps.length === 1) return { title: gendered(to, 'Cha', 'Mẹ', 'Cha/Mẹ'), note: null };
+    if (steps.length === 1) {
+      if (region === 'nam') return { title: gendered(to, 'Ba', 'Má', 'Ba/Má'), note: null };
+      if (region === 'bac') return { title: gendered(to, 'Bố', 'Mẹ', 'Bố/Mẹ'), note: null };
+      return { title: gendered(to, 'Cha', 'Mẹ', 'Cha/Mẹ'), note: null };
+    }
     if (steps.length === 2) return { title: gendered(to, 'Ông', 'Bà', 'Ông/Bà'), note: null };
     if (steps.length === 3) return { title: gendered(to, 'Cụ ông', 'Cụ bà', 'Cụ'), note: null };
     if (steps.length === 4) return { title: gendered(to, 'Ông kỵ', 'Bà kỵ', 'Kỵ'), note: null };
@@ -252,6 +266,11 @@ function titleForPath(
       const age = compareAge(to, parent);
       const paternal = parent.gender === 'male';
       const maternal = parent.gender === 'female';
+      if (region === 'nam') {
+        // Miền Nam: chỉ anh của cha là Bác; chị của cha là Cô, anh chị của mẹ là Cậu/Dì.
+        if (maternal) return { title: gendered(to, 'Cậu', 'Dì', 'Cậu/Dì'), note: null };
+        if (paternal && to.gender === 'female') return { title: 'Cô', note: null };
+      }
       if (age > 0) return { title: 'Bác', note: null };
       if (age < 0) {
         if (paternal) return { title: gendered(to, 'Chú', 'Cô', 'Chú/Cô'), note: null };
@@ -265,6 +284,29 @@ function titleForPath(
         title: 'Bác',
         note: 'Không rõ năm sinh nên mặc định xưng Bác (cách xưng tôn trọng với bậc trên).',
       };
+    }
+    case 'up,up,down,across': {
+      // Vợ/chồng của bác/chú/cô/cậu/dì: thím, mợ, dượng…
+      const uncle = titleForPath(steps.slice(0, 3), nodes.slice(0, 4), byId, graph, fromId, region);
+      const t = uncle.title;
+      const sp = to;
+      const chongCoDi = region === 'nam' ? 'Dượng' : 'Chú';
+      const map: Record<string, string> = {
+        Bác: gendered(sp, 'Bác trai', 'Bác gái', 'Bác'),
+        Chú: 'Thím',
+        Cô: chongCoDi,
+        Cậu: 'Mợ',
+        Dì: chongCoDi,
+      };
+      if (t && map[t])
+        return {
+          title: map[t],
+          note:
+            (t === 'Cô' || t === 'Dì') && !region
+              ? 'Chồng của cô/dì: miền Bắc thường gọi Chú, miền Nam gọi Dượng.'
+              : uncle.note,
+        };
+      return { title: null, note: `Vợ/chồng của ${t ? lowerFirst(t) : 'anh chị em của cha/mẹ'}.` };
     }
     case 'up,down,down': {
       // Cháu (con của anh/chị/em).

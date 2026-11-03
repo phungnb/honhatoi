@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { get } from "@/lib/api";
+import { del, get, put } from "@/lib/api";
 import { useLineages } from "@/lib/lineage";
 import { canManageLineage, roleLabel } from "@/lib/roles";
 import BieuTuong from "@/components/BieuTuong";
@@ -35,6 +35,139 @@ interface KinshipResult {
   title: string | null;
   sentence: string | null;
   note: string | null;
+  myNote?: { title: string; note?: string | null } | null;
+}
+
+/** Danh xưng hay dùng để tự chọn; vùng miền và từng nhà gọi khác nhau. */
+const XUNG_HO = ["Bác", "Chú", "Thím", "Cô", "Dì", "Dượng", "Cậu", "Mợ", "Ông", "Bà", "Anh", "Chị", "Em", "Cháu"];
+
+function readMien(): "bac" | "nam" {
+  try {
+    return localStorage.getItem("hnt_mien") === "nam" ? "nam" : "bac";
+  } catch {
+    return "bac";
+  }
+}
+
+/** Cách nhà mình gọi: chọn danh xưng hoặc tự điền, kèm ghi chú. Chỉ mình thấy. */
+function XungHoRieng({
+  lineageId,
+  fromId,
+  toId,
+  current,
+  onSaved,
+}: {
+  lineageId: string;
+  fromId: string;
+  toId: string;
+  current: { title: string; note?: string | null } | null;
+  onSaved: (n: { title: string; note?: string | null } | null) => void;
+}) {
+  const initPreset = !current || XUNG_HO.includes(current.title);
+  const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState(current ? (initPreset ? current.title : "__khac") : "");
+  const [text, setText] = useState(current && !initPreset ? current.title : "");
+  const [note, setNote] = useState(current?.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const title = pick === "__khac" ? text.trim() : pick;
+
+  async function save() {
+    if (!title) return setErr("Chọn hoặc điền cách gọi.");
+    setBusy(true);
+    setErr(null);
+    try {
+      const b = await put<{ data?: { myNote?: { title: string; note?: string | null } } }>(
+        `/genealogy/lineages/${lineageId}/kinship-notes`,
+        { fromId, toId, title, note: note.trim() || undefined },
+      );
+      onSaved(b?.data?.myNote ?? { title, note });
+      setOpen(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Không lưu được");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setBusy(true);
+    try {
+      await del(`/genealogy/lineages/${lineageId}/kinship-notes?from=${fromId}&to=${toId}`);
+      onSaved(null);
+      setPick("");
+      setText("");
+      setNote("");
+      setOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open)
+    return (
+      <button className="chip" style={{ marginTop: 8 }} onClick={() => setOpen(true)}>
+        {current ? "Sửa cách nhà mình gọi" : "Nhà mình gọi khác? Tự chọn cách gọi"}
+      </button>
+    );
+  return (
+    <div className="xung-ho-rieng">
+      <div className="btn-row" style={{ flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label className="muted-text" style={{ flex: "1 1 160px" }}>
+          Nhà mình gọi là
+          <select className="field" value={pick} onChange={(e) => setPick(e.target.value)}>
+            <option value="">— Chọn —</option>
+            {XUNG_HO.map((x) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+            <option value="__khac">Khác (tự điền)…</option>
+          </select>
+        </label>
+        {pick === "__khac" && (
+          <label className="muted-text" style={{ flex: "1 1 160px" }}>
+            Cách gọi
+            <input
+              className="field"
+              value={text}
+              maxLength={50}
+              placeholder="VD: Bác Hai, Cô Út, Dượng Ba"
+              onChange={(e) => setText(e.target.value)}
+            />
+          </label>
+        )}
+      </div>
+      <label className="muted-text" style={{ display: "block", marginTop: 8 }}>
+        Ghi chú (không bắt buộc)
+        <textarea
+          className="field"
+          rows={2}
+          maxLength={1000}
+          value={note}
+          placeholder="VD: Ở quê gọi theo thứ trong nhà; chồng của cô Út"
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </label>
+      {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
+      <div className="btn-row" style={{ marginTop: 8 }}>
+        <button className="btn primary" disabled={busy} onClick={() => void save()}>
+          Lưu cách gọi
+        </button>
+        {current && (
+          <button className="btn" disabled={busy} onClick={() => void remove()}>
+            Bỏ, dùng gợi ý
+          </button>
+        )}
+        <button className="btn" onClick={() => setOpen(false)}>
+          Hủy
+        </button>
+      </div>
+      <p className="muted-text" style={{ fontSize: "0.8125rem" }}>
+        Chỉ bạn thấy cách gọi này.
+      </p>
+    </div>
+  );
 }
 
 const year = (iso?: string | null) => (iso ? iso.slice(0, 4) : "");
@@ -56,6 +189,8 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
   const [toId, setToId] = useState("");
   const [kinship, setKinship] = useState<KinshipResult | null>(null);
   const [kinshipBusy, setKinshipBusy] = useState(false);
+  const [mien, setMien] = useState<"bac" | "nam">("bac");
+  useEffect(() => setMien(readMien()), []);
 
   useEffect(() => {
     if (!demo) return;
@@ -91,14 +226,14 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
       .finally(() => setLoading(false));
   }, [lineage, demo, member.loading]);
 
-  async function lookupKinship() {
+  async function lookupKinship(region: "bac" | "nam" = mien) {
     if (!fromId || !toId || !lineage) return;
     setKinshipBusy(true);
     try {
       const b = await get<{ data?: KinshipResult }>(
         demo
-          ? `/demo/kinship?from=${fromId}&to=${toId}`
-          : `/genealogy/lineages/${lineage.id}/kinship?from=${fromId}&to=${toId}`,
+          ? `/demo/kinship?from=${fromId}&to=${toId}&mien=${region}`
+          : `/genealogy/lineages/${lineage.id}/kinship?from=${fromId}&to=${toId}&mien=${region}`,
       );
       setKinship(b?.data ?? null);
     } catch (e) {
@@ -171,7 +306,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
           <h2 className="card-title">Bạn đang xem dữ liệu mẫu</h2>
           <p className="muted-text">
             Đây là cái con cháu thấy khi vào họ: cây theo đời, hồ sơ từng
-            người (bấm vào tên), ngày giỗ âm lịch, tra vai vế. Trưởng tộc và
+            người (bấm vào tên), ngày giỗ âm lịch, tra vai vế. Chủ gia phả và
             Ban quản trị còn có trang Quản lý để dựng cây, duyệt đề xuất,
             phân vai trò, mời con cháu qua Zalo.
           </p>
@@ -292,7 +427,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
         <div className="card section-gap" id="vai-ve">
           <h2 className="card-title">Tra vai vế xưng hô</h2>
           <p className="muted-text">
-            Chọn hai người để biết người kia là gì của mình, ví dụ "Chú", "Bác", "Cô".
+            Chọn hai người để biết người kia là gì của mình, ví dụ "Chú", "Bác", "Cô". Miền Bắc và miền Nam gọi khác nhau; nhà mình gọi khác thì tự chọn hoặc tự điền.
           </p>
           <div className="btn-row section-gap" style={{ flexWrap: "wrap", alignItems: "end" }}>
             <label className="muted-text" style={{ flex: "1 1 200px" }}>
@@ -317,6 +452,26 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
                 ))}
               </select>
             </label>
+            <label className="muted-text" style={{ flex: "0 1 150px" }}>
+              Cách xưng
+              <select
+                className="field"
+                value={mien}
+                onChange={(e) => {
+                  const v = e.target.value === "nam" ? "nam" : "bac";
+                  setMien(v);
+                  try {
+                    localStorage.setItem("hnt_mien", v);
+                  } catch {
+                    /* không lưu được thì thôi */
+                  }
+                  if (kinship) void lookupKinship(v);
+                }}
+              >
+                <option value="bac">Miền Bắc</option>
+                <option value="nam">Miền Nam</option>
+              </select>
+            </label>
             <button
               className="btn primary"
               disabled={!fromId || !toId || kinshipBusy}
@@ -327,7 +482,20 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
           </div>
           {kinship && (
             <div style={{ marginTop: 12 }}>
-              {kinship.title ? (
+              {kinship.myNote ? (
+                <>
+                  <p>
+                    <strong style={{ color: "var(--brand)", fontSize: 20 }}>{kinship.myNote.title}</strong>
+                    <span className="muted-text"> — cách nhà bạn gọi</span>
+                  </p>
+                  {kinship.myNote.note && <p className="muted-text">Ghi chú: {kinship.myNote.note}</p>}
+                  {kinship.title && (
+                    <p className="muted-text">
+                      Gợi ý theo {mien === "nam" ? "miền Nam" : "miền Bắc"}: {kinship.title}
+                    </p>
+                  )}
+                </>
+              ) : kinship.title ? (
                 <p>
                   <strong style={{ color: "var(--brand)", fontSize: 20 }}>{kinship.title}</strong>
                   {kinship.sentence && <span className="muted-text"> — {kinship.sentence}</span>}
@@ -336,6 +504,16 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
                 <p className="muted-text">Chưa xác định được danh xưng.</p>
               )}
               {kinship.note && <p className="muted-text">{kinship.note}</p>}
+              {!demo && lineage && (
+                <XungHoRieng
+                  key={`${fromId}-${toId}-${kinship.myNote?.title ?? ""}`}
+                  lineageId={lineage.id}
+                  fromId={fromId}
+                  toId={toId}
+                  current={kinship.myNote ?? null}
+                  onSaved={(n) => setKinship((k) => (k ? { ...k, myNote: n } : k))}
+                />
+              )}
             </div>
           )}
         </div>

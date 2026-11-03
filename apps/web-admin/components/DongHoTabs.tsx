@@ -1,6 +1,6 @@
 "use client";
 
-/** Thanh chuyển mục của tab Dòng họ (đặc tả 3.1): Bảng tin, Sự kiện, Thành viên. */
+/** Thanh chuyển mục của tab Dòng họ (đặc tả 3.1): Bảng tin, Sự kiện, Thành viên, Lịch sử họ. */
 
 import Link from "next/link";
 
@@ -8,6 +8,7 @@ const TABS = [
   { href: "/app/dong-ho", key: "bang-tin", label: "Bảng tin" },
   { href: "/app/su-kien", key: "su-kien", label: "Sự kiện" },
   { href: "/app/dong-ho/thanh-vien", key: "thanh-vien", label: "Thành viên" },
+  { href: "/app/dong-ho/lich-su", key: "lich-su", label: "Lịch sử họ" },
 ] as const;
 
 export default function DongHoTabs({ active }: { active: (typeof TABS)[number]["key"] }) {
