@@ -415,66 +415,68 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
             />
           </label>
         </div>
-        <div className="muted-text" style={{ marginTop: 12 }}>
-          Ngày mất
-          <div className="ngay-mat">
-            <select
-              aria-label="Lịch"
-              value={form.deathCal}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, deathCal: e.target.value as "al" | "dl", deathDirty: true }))
-              }
-            >
-              <option value="al">ÂL</option>
-              <option value="dl">DL</option>
-            </select>
-            <input
-              value={form.deathText}
-              onChange={(e) => {
-                const v = e.target.value;
-                setForm((f) => ({ ...f, deathText: v, deceased: f.deceased || !!v.trim(), deathDirty: true }));
-              }}
-              placeholder="ngày/tháng/năm hoặc năm"
-              inputMode="numeric"
-              maxLength={10}
-            />
-            {form.deathCal === "al" && form.deathText.includes("/") && (
-              <span className="chk">
-                <input
-                  type="checkbox"
-                  checked={form.lunarLeap}
-                  onChange={(e) => setForm((f) => ({ ...f, lunarLeap: e.target.checked, deathDirty: true }))}
-                />
-                Nhuận
-              </span>
-            )}
-            <span className="chk">
-              <input
-                type="checkbox"
-                checked={form.deceased}
-                onChange={(e) =>
-                  setForm((f) =>
-                    e.target.checked
-                      ? { ...f, deceased: true, deathDirty: true }
-                      : { ...f, deceased: false, deathText: "", lunarLeap: false, deathDirty: true },
-                  )
-                }
-              />
-              Đã mất
-            </span>
-          </div>
-        </div>
+        <label className="muted-text" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, width: "fit-content" }}>
+          <input
+            type="checkbox"
+            checked={form.deceased}
+            onChange={(e) =>
+              setForm((f) =>
+                e.target.checked
+                  ? { ...f, deceased: true, deathDirty: true }
+                  : { ...f, deceased: false, deathText: "", lunarLeap: false, deathDirty: true },
+              )
+            }
+          />
+          Đã mất
+        </label>
         {form.deceased && (
-          <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
-            Phần mộ ở đâu
-            <textarea
-              style={{ ...inputStyle, minHeight: 64, resize: "vertical" }}
-              value={form.burialPlace}
-              maxLength={255}
-              onChange={(e) => set("burialPlace")(e.target.value)}
-              placeholder="VD: Nghĩa trang họ Nguyễn, xã Thanh Ngọc; khu B, hàng 2, mộ thứ 3 tính từ cổng"
-            />
-          </label>
+          <>
+            <div className="muted-text" style={{ marginTop: 12 }}>
+              Ngày mất
+              <div className="ngay-mat">
+                <select
+                  aria-label="Lịch"
+                  value={form.deathCal}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, deathCal: e.target.value as "al" | "dl", deathDirty: true }))
+                  }
+                >
+                  <option value="al">ÂL</option>
+                  <option value="dl">DL</option>
+                </select>
+                <input
+                  value={form.deathText}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((f) => ({ ...f, deathText: v, deathDirty: true }));
+                  }}
+                  placeholder="ngày/tháng/năm hoặc năm"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
+                {form.deathCal === "al" && form.deathText.includes("/") && (
+                  <span className="chk">
+                    <input
+                      type="checkbox"
+                      checked={form.lunarLeap}
+                      onChange={(e) => setForm((f) => ({ ...f, lunarLeap: e.target.checked, deathDirty: true }))}
+                    />
+                    Nhuận
+                  </span>
+                )}
+              </div>
+            </div>
+            <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
+              Phần mộ ở đâu
+              <textarea
+                style={{ ...inputStyle, minHeight: 64, resize: "vertical" }}
+                value={form.burialPlace}
+                maxLength={255}
+                onChange={(e) => set("burialPlace")(e.target.value)}
+                placeholder="VD: Nghĩa trang họ Nguyễn, xã Thanh Ngọc; khu B, hàng 2, mộ thứ 3 tính từ cổng"
+              />
+            </label>
+          </>
         )}
         <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
           Chi / nhánh (không bắt buộc, để trống thì theo người liên quan)
