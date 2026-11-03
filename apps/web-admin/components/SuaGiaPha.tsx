@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { del, get, patch, post } from "@/lib/api";
+import { del, get, patch, post, put } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 
 interface Person {
@@ -28,6 +28,7 @@ interface Person {
   deathLunarText?: string | null;
   annivSolarDay?: number | null;
   annivSolarMonth?: number | null;
+  sortOrder?: number | null;
   generation?: number | null;
   branch?: string | null;
   updatedAt?: string;
@@ -351,8 +352,27 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
   const sorted = [...persons].sort(
     (a, b) =>
       (a.generation ?? 99) - (b.generation ?? 99) ||
+      (a.sortOrder ?? 1e9) - (b.sortOrder ?? 1e9) ||
+      (a.dateOfBirth ?? "9999").localeCompare(b.dateOfBirth ?? "9999") ||
       a.fullName.localeCompare(b.fullName),
   );
+
+  /** Đổi chỗ với người kề trên/dưới trong cùng đời rồi lưu thứ tự cả danh sách. */
+  async function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= sorted.length || sorted[j].generation !== sorted[i].generation) return;
+    const next = [...sorted];
+    [next[i], next[j]] = [next[j], next[i]];
+    const ids = next.map((p) => p.id);
+    const prev = persons;
+    setPersons(persons.map((p) => ({ ...p, sortOrder: ids.indexOf(p.id) })));
+    try {
+      await put(`/genealogy/lineages/${lineageId}/persons/order`, { ids });
+    } catch (e) {
+      setPersons(prev);
+      setError(apiMessage(e));
+    }
+  }
 
   return (
     <>
@@ -584,7 +604,7 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
           <div className="table-wrap">
             <table>
               <tbody>
-                {sorted.map((p) => (
+                {sorted.map((p, i) => (
                   <tr key={p.id}>
                     <td>
                       <strong>{p.fullName}</strong>
@@ -600,6 +620,22 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
                       {p.branch ? ` · ${p.branch}` : ""}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
+                      <button
+                        className="btn btn-icon"
+                        aria-label={`Đưa ${p.fullName} lên`}
+                        disabled={busy || i === 0 || sorted[i - 1].generation !== p.generation}
+                        onClick={() => void move(i, -1)}
+                      >
+                        ↑
+                      </button>{" "}
+                      <button
+                        className="btn btn-icon"
+                        aria-label={`Đưa ${p.fullName} xuống`}
+                        disabled={busy || i === sorted.length - 1 || sorted[i + 1].generation !== p.generation}
+                        onClick={() => void move(i, 1)}
+                      >
+                        ↓
+                      </button>{" "}
                       <button className="btn" disabled={busy} onClick={() => startEdit(p)}>
                         Sửa
                       </button>{" "}

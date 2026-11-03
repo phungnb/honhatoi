@@ -344,6 +344,8 @@ model FamilyPerson {
   /// Giỗ theo dương lịch (gia đình làm giỗ ngày dương): ngày/tháng, không năm.
   annivSolarDay     Int?               @map("anniv_solar_day") @db.SmallInt
   annivSolarMonth   Int?               @map("anniv_solar_month") @db.SmallInt
+  /// Thứ tự sắp xếp do người giữ gia phả chỉnh (anh/chị/em trong cùng đời).
+  sortOrder         Int?               @map("sort_order")
   generation        Int?
   branch            String?            @db.VarChar(255)
   roleInLineage     String?            @map("role_in_lineage") @db.VarChar(255)

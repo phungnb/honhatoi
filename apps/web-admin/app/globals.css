@@ -1715,3 +1715,7 @@ blockquote.trich-dan {
 .ngay-mat select { width: auto; }
 .ngay-mat input:not([type="checkbox"]) { flex: 1 1 160px; min-width: 0; }
 .ngay-mat .chk { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+
+/* Nút lên/xuống sắp xếp danh sách người */
+.btn.btn-icon { padding-left: 10px; padding-right: 10px; min-width: 36px; }
+.btn.btn-icon:disabled { opacity: 0.3; cursor: default; }

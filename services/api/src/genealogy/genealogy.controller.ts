@@ -22,6 +22,7 @@ import { CreateRelationshipDto } from './dto/create-relationship.dto';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { ReviewProposalDto } from './dto/review-proposal.dto';
 import { KinshipNoteDto } from './dto/kinship-note.dto';
+import { PersonOrderDto } from './dto/person-order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { LineageGuard } from '../common/guards/lineage.guard';
 import { CurrentUserId } from '../common/decorators/current-user.decorator';
@@ -191,6 +192,17 @@ export class GenealogyController {
         message: 'Cần đủ tham số from và to (id của hai người cần xem vai vế)',
       });
     return this.genealogy.kinship(lineageId, userId, from, to, mien === 'nam' || mien === 'bac' ? mien : undefined);
+  }
+
+  /// PUT /genealogy/lineages/:lineageId/persons/order — sắp xếp lại thứ tự người.
+  @Put('lineages/:lineageId/persons/order')
+  @UseGuards(LineageGuard)
+  reorderPersons(
+    @Param('lineageId') lineageId: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: PersonOrderDto,
+  ) {
+    return this.genealogy.reorderPersons(lineageId, userId, dto.ids);
   }
 
   /// PUT /genealogy/lineages/:lineageId/kinship-notes — lưu cách xưng hô

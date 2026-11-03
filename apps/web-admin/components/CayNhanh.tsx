@@ -16,6 +16,7 @@ export interface CayPerson {
   dateOfDeath?: string | null;
   deathLunarDay?: number | null;
   isDeceased?: boolean;
+  sortOrder?: number | null;
   generation?: number | null;
   roleInLineage?: string | null;
 }
@@ -76,7 +77,9 @@ export function dungCay(
       push(spouses, r.relatedPersonId, r.personId);
     }
   }
+  // Thứ tự do người giữ gia phả sắp xếp, chưa sắp thì theo năm sinh.
   const byBirth = (a: string, b: string) =>
+    (byId.get(a)?.sortOrder ?? 1e9) - (byId.get(b)?.sortOrder ?? 1e9) ||
     (byId.get(a)?.dateOfBirth ?? "9999").localeCompare(byId.get(b)?.dateOfBirth ?? "9999");
   children.forEach((a) => a.sort(byBirth));
 
