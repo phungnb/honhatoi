@@ -464,6 +464,30 @@ export class GenealogyService {
    * - có canEdit → cập nhật trực tiếp
    * - chỉ có canPropose → tạo đề xuất update_person + chuyển person sang pending_verification
    */
+  /** Đặt lại thứ tự người trong họ theo danh sách id (cần quyền sửa gia phả). */
+  async reorderPersons(lineageId: string, userId: string, ids: string[]) {
+    const perm = await this.effectivePerm(lineageId, userId);
+    this.require(perm, 'canEdit', 'sắp xếp gia phả');
+    const uniq = Array.from(new Set(ids));
+    const found = await this.prisma.familyPerson.findMany({
+      where: { id: { in: uniq }, lineageId, deletedAt: null },
+      select: { id: true, sortOrder: true },
+    });
+    if (found.length !== uniq.length)
+      throw new BadRequestException({ code: 'INVALID_PERSON', message: 'Có người không thuộc dòng họ này' });
+    const cur = new Map(found.map((p) => [p.id, p.sortOrder]));
+    // Chỉ ghi những người đổi chỗ để giao dịch ngắn.
+    const changed = uniq.map((id, i) => ({ id, i })).filter(({ id, i }) => cur.get(id) !== i);
+    await this.prisma.$transaction(async (tx) => {
+      for (const { id, i } of changed)
+        await tx.familyPerson.update({ where: { id }, data: { sortOrder: i } });
+      await this.audit(tx as never, lineageId, userId, 'genealogy.person.reorder', 'lineage', lineageId, {
+        count: changed.length,
+      });
+    }, { timeout: 30000 });
+    return { data: { ok: true }, error: null };
+  }
+
   async updatePerson(personId: string, userId: string, dto: UpdatePersonDto) {
     const person = await this.getPersonOrThrow(personId);
     const perm = await this.effectivePerm(person.lineageId, userId);
