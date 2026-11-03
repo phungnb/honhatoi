@@ -30,6 +30,11 @@ export class CreatePersonDto {
   @IsBoolean()
   deathYearOnly?: boolean;
 
+  /** Đã mất, không rõ năm/ngày. */
+  @IsOptional()
+  @IsBoolean()
+  isDeceased?: boolean;
+
   @IsOptional()
   @IsString()
   hometown?: string;

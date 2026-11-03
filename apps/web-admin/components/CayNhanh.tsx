@@ -15,6 +15,7 @@ export interface CayPerson {
   dateOfBirth?: string | null;
   dateOfDeath?: string | null;
   deathLunarDay?: number | null;
+  isDeceased?: boolean;
   generation?: number | null;
   roleInLineage?: string | null;
 }
@@ -29,9 +30,13 @@ export interface CayRelationship {
 
 const year = (iso?: string | null) => (iso ? iso.slice(0, 4) : "");
 
+/** Đã mất: có ngày/năm mất (âm hoặc dương) hoặc đánh dấu "Đã mất" không rõ năm. */
+export const daMat = (p: { dateOfDeath?: string | null; deathLunarDay?: number | null; isDeceased?: boolean }) =>
+  !!(p.dateOfDeath || p.deathLunarDay || p.isDeceased);
+
 export function years(p: CayPerson): string {
   const b = year(p.dateOfBirth);
-  const d = year(p.dateOfDeath);
+  const d = year(p.dateOfDeath) || (daMat(p) && b ? "?" : "");
   if (!b && !d) return "";
   return d ? `${b || "?"} – ${d}` : b;
 }
@@ -143,7 +148,7 @@ export default function CayNhanh({
       <button
         key={id}
         className={`cay-chip${spouse ? " spouse" : ""}${p.gender === "female" ? " female" : ""}${
-          p.dateOfDeath ? " dead" : ""
+          daMat(p) ? " dead" : ""
         }`}
         onClick={() => onOpen(id)}
       >

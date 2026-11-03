@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { del, get, patch, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import { daMat } from "@/components/CayNhanh";
 
 interface Person {
   id: string;
@@ -37,6 +38,7 @@ interface Person {
   deathLunarDay?: number | null;
   deathLunarMonth?: number | null;
   deathLunarLeap?: boolean;
+  isDeceased?: boolean;
   updatedAt?: string;
   accountLink?: { status: string; mine: boolean; displayName: string } | null;
 }
@@ -87,14 +89,14 @@ export default function HoSoNguoi({
         ["Chi", p.branch],
         ["Vai trò trong họ", p.roleInLineage],
         ["Sinh", fmtDate(p.dateOfBirth, p.birthYearOnly)],
-        ["Mất", fmtDate(p.dateOfDeath, p.deathYearOnly)],
+        ["Mất", fmtDate(p.dateOfDeath, p.deathYearOnly) || (p.isDeceased ? "Không rõ năm" : null)],
         [
           "Giỗ (âm lịch)",
           p.deathLunarDay && p.deathLunarMonth
             ? `${p.deathLunarDay}/${p.deathLunarMonth}${p.deathLunarLeap ? " nhuận" : ""}`
             : null,
         ],
-        ["Phần mộ", p.burialPlace || (p.dateOfDeath || p.deathLunarDay ? "Chưa ghi, bấm “Sửa / đề xuất sửa” để bổ sung" : null)],
+        ["Phần mộ", p.burialPlace || (daMat(p) ? "Chưa ghi, bấm “Sửa / đề xuất sửa” để bổ sung" : null)],
         ["Quê quán", p.hometown],
         ["Nơi ở", p.currentPlace],
         ["Nghề nghiệp", p.occupation],
@@ -120,15 +122,15 @@ export default function HoSoNguoi({
           <>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <div
-                className={`avatar${p.gender === "female" ? " female" : ""}${p.dateOfDeath || p.deathLunarDay ? " dead" : ""}`}
+                className={`avatar${p.gender === "female" ? " female" : ""}${daMat(p) ? " dead" : ""}`}
                 style={{ width: 52, height: 52, fontSize: 20 }}
               >
                 {p.fullName.trim().split(/\s+/).pop()?.[0] ?? "?"}
               </div>
               <div className="grow">
                 <h2 style={{ fontSize: 20 }}>{p.fullName}</h2>
-                <span className={`badge ${p.dateOfDeath || p.deathLunarDay ? "warm" : "brand"}`}>
-                  {p.dateOfDeath || p.deathLunarDay ? "Đã mất" : "Đang sống"}
+                <span className={`badge ${daMat(p) ? "warm" : "brand"}`}>
+                  {daMat(p) ? "Đã mất" : "Đang sống"}
                 </span>
               </div>
             </div>
@@ -317,7 +319,7 @@ function NhanHoSo({ person, onDone }: { person: Person; onDone: (msg: string) =>
   }
 
   if (link && !link.mine) return null;
-  if (!link && person.dateOfDeath) return null;
+  if (!link && daMat(person)) return null;
   return (
     <div className="nhan-ho-so">
       {link?.status === "pending" && <p className="sub">Bạn đã báo đây là bạn — đang chờ Ban quản trị xác nhận.</p>}
