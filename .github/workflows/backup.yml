@@ -1,0 +1,53 @@
+name: Sao lưu database
+
+# Sao lưu production mỗi ngày lúc 02:00 giờ Việt Nam (kiểm toán C2). Gói Neon
+# hiện tại chỉ giữ lịch sử 6 giờ và không bật được snapshot tự động.
+# Repo đang CÔNG KHAI nên Artifacts ai đăng nhập GitHub cũng tải được: bản
+# dump BẮT BUỘC mã hóa (gpg AES256) bằng BACKUP_PASSPHRASE trước khi tải lên.
+# File nằm ở mục Artifacts của mỗi lần chạy, giữ 30 ngày. Khôi phục:
+#   gpg -d honhatoi-YYYYMMDD.dump.gpg > honhatoi.dump
+#   pg_restore --no-owner --clean --if-exists -d "<DATABASE_URL đích>" honhatoi.dump
+# Cần 2 secret: PROD_DATABASE_URL và BACKUP_PASSPHRASE
+# (Settings → Secrets and variables → Actions). Mất passphrase = mất bản sao lưu.
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kiểm tra secret
+        env:
+          URL: ${{ secrets.PROD_DATABASE_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$PASS" ]; then
+            echo "::error::Chưa đặt đủ secret PROD_DATABASE_URL và BACKUP_PASSPHRASE"
+            exit 1
+          fi
+      - name: Cài pg_dump 18 (khớp Postgres của Neon)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+      - name: pg_dump + mã hóa
+        env:
+          URL: ${{ secrets.PROD_DATABASE_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          f="honhatoi-$(date -u +%Y%m%d).dump"
+          /usr/lib/postgresql/18/bin/pg_dump --format=custom --no-owner --dbname="$URL" --file="$f"
+          /usr/lib/postgresql/18/bin/pg_restore --list "$f" | grep -c "TABLE DATA" | xargs echo "Số bảng có dữ liệu:"
+          echo "$PASS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "$f.gpg" "$f"
+          rm -f "$f"
+          echo "FILE=$f.gpg" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 30

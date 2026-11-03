@@ -1,0 +1,27 @@
+name: API
+
+# Kiểm tra backend mỗi PR (kiểm toán H7): biên dịch TypeScript và chạy bộ test
+# (lịch âm, danh xưng họ hàng, lịch sử sửa, ma trận quyền, chống truy cập chéo họ).
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['services/api/**', '.github/workflows/api.yml']
+  pull_request:
+    paths: ['services/api/**', '.github/workflows/api.yml']
+
+defaults:
+  run:
+    working-directory: services/api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --include=dev --no-audit --no-fund
+      - run: npx prisma generate
+      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npm test

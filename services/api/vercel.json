@@ -1,1 +1,16 @@
-{"buildCommand": "npx prisma generate && npm run build && sh scripts/db-sync.sh", "installCommand": "npm install --include=dev", "rewrites": [{"source": "/api/v1/:path*", "destination": "/api"}]}
+{
+  "buildCommand": "npx prisma generate && npm run build && sh scripts/db-sync.sh",
+  "installCommand": "npm install --include=dev",
+  "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "/api"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/cron/anniversary-reminders",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

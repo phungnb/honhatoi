@@ -323,6 +323,11 @@ model FamilyPerson {
   // MỞ RỘNG so với spec: vị trí phần mộ (yêu cầu từ bản prototype — hồ sơ
   // hiển thị "Phần mộ ở đâu" khi người đã mất). Tên cột snake_case.
   burialPlace       String?            @map("burial_place") @db.VarChar(255)
+  // Ngày mất theo âm lịch (nhiều cụ chỉ biết ngày âm, không rõ năm/ngày
+  // dương). Có thì ngày giỗ tính theo đây thay vì đổi từ date_of_death.
+  deathLunarDay     Int?               @map("death_lunar_day") @db.SmallInt
+  deathLunarMonth   Int?               @map("death_lunar_month") @db.SmallInt
+  deathLunarLeap    Boolean            @default(false) @map("death_lunar_leap")
   generation        Int?
   branch            String?            @db.VarChar(255)
   roleInLineage     String?            @map("role_in_lineage") @db.VarChar(255)

@@ -53,7 +53,7 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16px: cỡ gốc tối thiểu cho người lớn tuổi (kiểm toán L4) */
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
@@ -112,7 +112,7 @@ a {
 }
 
 .brand-sub {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--muted-2);
 }
 
@@ -157,7 +157,7 @@ a {
 .sidebar-foot {
   margin-top: auto;
   padding: 12px 10px 0;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--muted-2);
   border-top: 1px solid var(--border);
 }
@@ -243,7 +243,7 @@ a {
   align-items: center;
   gap: 4px;
   padding: 6px 2px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--muted);
   text-align: center;
@@ -290,7 +290,7 @@ table {
 thead th {
   text-align: left;
   padding: 12px 16px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--muted-2);
@@ -318,7 +318,7 @@ tbody tr:hover {
   align-items: center;
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -426,7 +426,7 @@ tbody tr:hover {
 }
 
 .stat-label {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--muted-2);
 }
 
@@ -592,7 +592,7 @@ tbody tr:hover {
   border-radius: 10px;
   background: var(--danger);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -881,7 +881,7 @@ blockquote.trich-dan {
   opacity: 0.75;
 }
 .cay-chip .sub {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 .cay-chip:hover {
   border-color: var(--brand);
@@ -1035,7 +1035,7 @@ blockquote.trich-dan {
   overflow: hidden;
 }
 .sd-box .sub {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1069,7 +1069,7 @@ blockquote.trich-dan {
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
   z-index: 1;
@@ -1353,7 +1353,7 @@ blockquote.trich-dan {
   font-variant-numeric: tabular-nums;
 }
 .stat2 .l {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--muted);
   margin-top: 2px;
 }

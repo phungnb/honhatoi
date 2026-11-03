@@ -23,6 +23,8 @@ import { UpdatePersonDto } from './dto/update-person.dto';
 import { CreateRelationshipDto } from './dto/create-relationship.dto';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DEMO_LINEAGE_ID } from '../common/demo';
+import { foldVietnamese } from '../common/text';
+import { diffFields, staleFields } from './history';
 
 /**
  * GenealogyService — triển khai đầy đủ module Gia phả.
@@ -48,7 +50,11 @@ const INVERSE: Record<string, string> = {
 const PARENT_TYPES = ['parent', 'adoptive_parent'];
 const SPOUSE_TYPES = ['spouse', 'ex_spouse'];
 /** Trường nhạy cảm: chỉ người có canEdit mới thấy đầy đủ. */
-const SENSITIVE_FIELDS = ['phone', 'email', 'bloodType'] as const;
+const SENSITIVE_FIELDS = ['phone', 'email', 'bloodType', 'currentPlace'] as const;
+/** Dưới tuổi này, người chỉ có quyền xem chỉ thấy năm sinh. */
+const CHILD_AGE = 16;
+/** Mốc nhắc giỗ (số ngày trước ngày giỗ). */
+const REMINDER_DAYS = [7, 3, 1, 0];
 
 interface Perm {
   canView: boolean;
@@ -145,6 +151,16 @@ export class GenealogyService {
       ...(person as unknown as Record<string, unknown>),
     };
     for (const f of SENSITIVE_FIELDS) delete copy[f];
+    // Hồ sơ trẻ em: ẩn ngày/tháng sinh, chỉ giữ năm.
+    const dob = copy['dateOfBirth'];
+    if (dob && !copy['dateOfDeath']) {
+      const d = new Date(dob as string | Date);
+      const ageMs = Date.now() - d.getTime();
+      if (ageMs < CHILD_AGE * 365.25 * 86400000) {
+        copy['dateOfBirth'] = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        copy['birthYearOnly'] = true;
+      }
+    }
     return copy as T;
   }
 
@@ -213,6 +229,9 @@ export class GenealogyService {
       'hobbies',
       'bio',
       'burialPlace',
+      'deathLunarDay',
+      'deathLunarMonth',
+      'deathLunarLeap',
       'generation',
       'branch',
       'roleInLineage',
@@ -280,17 +299,22 @@ export class GenealogyService {
   async searchPersons(lineageId: string, userId: string, q: string) {
     const perm = await this.effectivePerm(lineageId, userId);
     this.require(perm, 'canView', 'xem gia phả');
-    const persons = await this.prisma.familyPerson.findMany({
-      where: {
-        lineageId,
-        deletedAt: null,
-        ...(q
-          ? { fullName: { contains: q, mode: 'insensitive' } }
-          : {}),
-      },
+    // Lọc trong bộ nhớ để so khớp không dấu ("nguyen van a" ra "Nguyễn Văn A");
+    // một dòng họ vài nghìn hồ sơ vẫn nhẹ.
+    const needle = foldVietnamese(q ?? '');
+    const all = await this.prisma.familyPerson.findMany({
+      where: { lineageId, deletedAt: null },
       orderBy: { fullName: 'asc' },
-      take: 50,
     });
+    const persons = (
+      needle
+        ? all.filter(
+            (p) =>
+              foldVietnamese(p.fullName).includes(needle) ||
+              (p.nickname ? foldVietnamese(p.nickname).includes(needle) : false),
+          )
+        : all
+    ).slice(0, 50);
     return {
       data: {
         persons: persons.map((p) => this.sanitize(p, perm.canEdit)),
@@ -441,21 +465,32 @@ export class GenealogyService {
       ...this.toPersonData(dto as unknown as Record<string, unknown>),
       updatedBy: userId,
     };
+    this.assertNotStale(person.updatedAt, dto.expectedUpdatedAt);
 
     if (perm.canEdit) {
-      const updated = await this.prisma.familyPerson.update({
-        where: { id: personId },
+      const { before, after } = diffFields(
+        person as unknown as Record<string, unknown>,
         data,
-      });
-      await this.audit(
-        this.prisma,
-        person.lineageId,
-        userId,
-        'genealogy.person.update',
-        'family_person',
-        personId,
-        {},
       );
+      const updated = await this.prisma.$transaction(async (tx) => {
+        // Ghi có điều kiện updatedAt để hai người bấm lưu cùng lúc không
+        // ghi đè nhau (người sau nhận 409).
+        const res = await tx.familyPerson.updateMany({
+          where: { id: personId, updatedAt: person.updatedAt },
+          data,
+        });
+        if (res.count === 0) this.throwStale();
+        await this.audit(
+          tx as never,
+          person.lineageId,
+          userId,
+          'genealogy.person.update',
+          'family_person',
+          personId,
+          { before, after },
+        );
+        return tx.familyPerson.findUniqueOrThrow({ where: { id: personId } });
+      });
       return {
         data: { person: this.sanitize(updated, true) },
         error: null,
@@ -493,12 +528,7 @@ export class GenealogyService {
     this.require(perm, 'canEdit', 'xóa hồ sơ');
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.familyRelationship.deleteMany({
-        where: {
-          lineageId: person.lineageId,
-          OR: [{ personId }, { relatedPersonId: personId }],
-        },
-      });
+      const relationships = await this.detachPerson(tx, person.lineageId, personId);
       await tx.familyPerson.update({
         where: { id: personId },
         data: { deletedAt: new Date() },
@@ -518,10 +548,133 @@ export class GenealogyService {
         'genealogy.person.delete',
         'family_person',
         personId,
-        {},
+        { fullName: person.fullName, relationships },
       );
     });
     return { data: { deleted: true }, error: null };
+  }
+
+  /**
+   * Gỡ mọi quan hệ của một người, trả về bản chụp để ghi vào nhật ký —
+   * nhờ đó khôi phục được hồ sơ cùng các quan hệ (kiểm toán H2).
+   */
+  private async detachPerson(
+    tx: Prisma.TransactionClient,
+    lineageId: string,
+    personId: string,
+  ) {
+    const rels = await tx.familyRelationship.findMany({
+      where: { lineageId, OR: [{ personId }, { relatedPersonId: personId }] },
+    });
+    await tx.familyRelationship.deleteMany({
+      where: { id: { in: rels.map((r) => r.id) } },
+    });
+    return rels.map((r) => ({
+      personId: r.personId,
+      relatedPersonId: r.relatedPersonId,
+      relationshipType: r.relationshipType,
+      startDate: r.startDate,
+      endDate: r.endDate,
+      note: r.note,
+      createdBy: r.createdBy,
+    }));
+  }
+
+  /**
+   * POST /genealogy/persons/:id/restore — khôi phục hồ sơ đã xóa cùng các
+   * quan hệ đã chụp lúc xóa (chỉ nối lại tới người còn tồn tại).
+   */
+  async restorePerson(personId: string, userId: string) {
+    const person = await this.prisma.familyPerson.findUnique({
+      where: { id: personId },
+    });
+    if (!person || !person.deletedAt)
+      throw new NotFoundException({
+        code: 'PERSON_NOT_DELETED',
+        message: 'Không tìm thấy hồ sơ đã xóa',
+      });
+    const perm = await this.effectivePerm(person.lineageId, userId);
+    this.require(perm, 'canEdit', 'khôi phục hồ sơ');
+    const log = await this.prisma.auditLog.findFirst({
+      where: {
+        lineageId: person.lineageId,
+        targetId: personId,
+        action: 'genealogy.person.delete',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const snap = ((log?.metadata as Record<string, unknown> | null)?.[
+      'relationships'
+    ] ?? []) as {
+      personId: string;
+      relatedPersonId: string;
+      relationshipType: string;
+      startDate: string | null;
+      endDate: string | null;
+      note: string | null;
+      createdBy: string | null;
+    }[];
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.familyPerson.update({
+        where: { id: personId },
+        data: { deletedAt: null, updatedBy: userId },
+      });
+      const otherIds = snap.map((r) =>
+        r.personId === personId ? r.relatedPersonId : r.personId,
+      );
+      const alive = new Set(
+        (
+          await tx.familyPerson.findMany({
+            where: { id: { in: otherIds }, deletedAt: null },
+            select: { id: true },
+          })
+        ).map((p) => p.id),
+      );
+      const rows = snap.filter((r) =>
+        alive.has(r.personId === personId ? r.relatedPersonId : r.personId),
+      );
+      const created = await tx.familyRelationship.createMany({
+        data: rows.map((r) => ({
+          lineageId: person.lineageId,
+          personId: r.personId,
+          relatedPersonId: r.relatedPersonId,
+          relationshipType: r.relationshipType,
+          startDate: r.startDate ? new Date(r.startDate) : null,
+          endDate: r.endDate ? new Date(r.endDate) : null,
+          note: r.note,
+          createdBy: r.createdBy,
+        })),
+        skipDuplicates: true,
+      });
+      await this.audit(
+        tx as never,
+        person.lineageId,
+        userId,
+        'genealogy.person.restore',
+        'family_person',
+        personId,
+        { fullName: person.fullName, relationshipsRestored: created.count },
+      );
+      return created.count;
+    });
+    return {
+      data: { restored: true, relationshipsRestored: result },
+      error: null,
+    };
+  }
+
+  /** updatedAt client gửi lên khác bản ghi hiện tại → đã có người sửa chen giữa. */
+  private assertNotStale(current: Date, expected?: string) {
+    if (expected && new Date(expected).getTime() !== current.getTime())
+      this.throwStale();
+  }
+
+  private throwStale(): never {
+    throw new ConflictException({
+      code: 'PERSON_CHANGED',
+      message:
+        'Hồ sơ vừa được người khác sửa. Hãy tải lại để xem bản mới rồi sửa tiếp.',
+    });
   }
 
   // ------------------------------------------------------- relationships
@@ -663,7 +816,14 @@ export class GenealogyService {
       'genealogy.relationship.delete',
       'family_relationship',
       relationshipId,
-      {},
+      {
+        personId: rel.personId,
+        relatedPersonId: rel.relatedPersonId,
+        relationshipType: rel.relationshipType,
+        startDate: rel.startDate,
+        endDate: rel.endDate,
+        note: rel.note,
+      },
     );
     return { data: { deleted: true }, error: null };
   }
@@ -785,6 +945,9 @@ export class GenealogyService {
     const payload = (proposal.payload ?? {}) as Record<string, unknown>;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Nhận đề xuất có điều kiện status='pending': hai lần bấm duyệt song
+      // song chỉ một lần áp dụng (kiểm toán M8).
+      await this.claimPending(tx, proposalId);
       let applied: unknown = null;
       switch (proposal.requestType) {
         case 'create_person': {
@@ -806,6 +969,32 @@ export class GenealogyService {
               message: 'Đề xuất thiếu hồ sơ cần sửa',
             });
           const after = (payload['after'] ?? {}) as Record<string, unknown>;
+          const before = (payload['before'] ?? {}) as Record<string, unknown>;
+          const current = await tx.familyPerson.findUniqueOrThrow({
+            where: { id: proposal.personId },
+          });
+          const data = this.toPersonData(after);
+          // Hồ sơ đã bị sửa sau khi đề xuất được gửi → không ghi đè im lặng.
+          const stale = staleFields(
+            before,
+            current as unknown as Record<string, unknown>,
+            Object.keys(data),
+          );
+          if (stale.length)
+            throw new ConflictException({
+              code: 'PROPOSAL_STALE',
+              message: `Hồ sơ đã được sửa sau khi gửi đề xuất (trường: ${stale.join(', ')}). Hãy từ chối và đề nghị gửi lại.`,
+            });
+          const diff = diffFields(current as unknown as Record<string, unknown>, data);
+          await this.audit(
+            tx as never,
+            proposal.lineageId,
+            reviewerId,
+            'genealogy.person.update',
+            'family_person',
+            proposal.personId,
+            { ...diff, proposalId },
+          );
           applied = await tx.familyPerson.update({
             where: { id: proposal.personId },
             data: {
@@ -822,19 +1011,28 @@ export class GenealogyService {
               code: 'PROPOSAL_MISSING_PERSON',
               message: 'Đề xuất thiếu hồ sơ cần xóa',
             });
-          await tx.familyRelationship.deleteMany({
-            where: {
-              lineageId: proposal.lineageId,
-              OR: [
-                { personId: proposal.personId },
-                { relatedPersonId: proposal.personId },
-              ],
-            },
-          });
+          const relationships = await this.detachPerson(
+            tx,
+            proposal.lineageId,
+            proposal.personId,
+          );
           applied = await tx.familyPerson.update({
             where: { id: proposal.personId },
             data: { deletedAt: new Date() },
           });
+          await this.audit(
+            tx as never,
+            proposal.lineageId,
+            reviewerId,
+            'genealogy.person.delete',
+            'family_person',
+            proposal.personId,
+            {
+              fullName: (applied as { fullName: string }).fullName,
+              relationships,
+              proposalId,
+            },
+          );
           break;
         }
         case 'create_relationship': {
@@ -1044,6 +1242,7 @@ export class GenealogyService {
     this.require(perm, 'canVerify', 'duyệt đề xuất');
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.claimPending(tx, proposalId);
       const pr = await tx.genealogyChangeRequest.update({
         where: { id: proposalId },
         data: {
@@ -1085,23 +1284,51 @@ export class GenealogyService {
     return { data: { change_request: updated }, error: null };
   }
 
+  /** Đặt đề xuất sang 'approved' có điều kiện; đã bị xử lý → 409. */
+  private async claimPending(tx: Prisma.TransactionClient, proposalId: string) {
+    const res = await tx.genealogyChangeRequest.updateMany({
+      where: { id: proposalId, status: 'pending' },
+      data: { status: 'approved' },
+    });
+    if (res.count === 0)
+      throw new ConflictException({
+        code: 'PROPOSAL_NOT_PENDING',
+        message: 'Đề xuất đã được xử lý trước đó',
+      });
+  }
+
   /**
-   * POST /genealogy/proposals/:id/dispute — đánh dấu tranh chấp.
-   * Ai có quyền đề xuất cũng có thể nêu tranh chấp (không phá hủy dữ liệu);
-   * việc gỡ tranh chấp do người có canVerify xử lý qua approve/reject đề xuất mới.
+   * POST /genealogy/proposals/:id/dispute — nêu ý kiến phản đối kèm lý do.
+   * Đề xuất VẪN chờ duyệt: tranh chấp là thêm thông tin cho người giữ gia
+   * phả phân xử, không phải quyền phủ quyết của một thành viên (kiểm toán
+   * H6). Hồ sơ liên quan được gắn DISPUTED cho tới khi đề xuất được xử lý.
    */
-  async disputeProposal(proposalId: string, userId: string) {
+  async disputeProposal(proposalId: string, userId: string, reason?: string) {
     const proposal = await this.getPendingProposalOrThrow(proposalId);
     const perm = await this.effectivePerm(proposal.lineageId, userId);
     this.require(perm, 'canPropose', 'nêu tranh chấp');
+    const text = reason?.trim();
+    if (!text)
+      throw new BadRequestException({
+        code: 'DISPUTE_REASON_REQUIRED',
+        message: 'Hãy ghi lý do hoặc nguồn tư liệu khi phản đối đề xuất',
+      });
 
+    const payload = (proposal.payload ?? {}) as Record<string, unknown>;
+    const disputes = Array.isArray(payload['disputes'])
+      ? (payload['disputes'] as unknown[])
+      : [];
     const updated = await this.prisma.$transaction(async (tx) => {
       const pr = await tx.genealogyChangeRequest.update({
         where: { id: proposalId },
         data: {
-          status: 'disputed',
-          reviewedBy: userId,
-          reviewedAt: new Date(),
+          payload: {
+            ...payload,
+            disputes: [
+              ...disputes,
+              { by: userId, at: new Date().toISOString(), reason: text.slice(0, 1000) },
+            ],
+          } as Prisma.InputJsonValue,
         },
       });
       if (proposal.personId) {
@@ -1117,10 +1344,25 @@ export class GenealogyService {
         'genealogy.change.dispute',
         'genealogy_change_request',
         proposalId,
-        { requestType: proposal.requestType },
+        { requestType: proposal.requestType, reason: text.slice(0, 1000) },
       );
       return pr;
     });
+    try {
+      const ids = await this.verifierIds(proposal.lineageId, userId);
+      await this.notifications.notifyMany(
+        ids.map((uid) => ({
+          userId: uid,
+          type: 'genealogy_disputed',
+          title: 'Có ý kiến phản đối một đề xuất',
+          body: text.slice(0, 200),
+          data: { proposalId, lineageId: proposal.lineageId },
+          dedupKey: `genealogy-disputed:${proposalId}:${disputes.length}:user:${uid}`,
+        })),
+      );
+    } catch {
+      // Lỗi thông báo không làm hỏng việc ghi nhận tranh chấp.
+    }
     return { data: { change_request: updated }, error: null };
   }
 
@@ -1188,7 +1430,49 @@ export class GenealogyService {
       orderBy: { createdAt: 'desc' },
       take: 30,
     });
-    return { data: { history, next_cursor: null }, error: null };
+    // Mọi lần sửa (trực tiếp hoặc qua duyệt) kèm giá trị trước/sau.
+    const edits = await this.prisma.auditLog.findMany({
+      where: {
+        lineageId: person.lineageId,
+        targetType: 'family_person',
+        targetId: personId,
+        action: {
+          in: [
+            'genealogy.person.update',
+            'genealogy.person.delete',
+            'genealogy.person.restore',
+          ],
+        },
+      },
+      include: { actor: { select: { id: true, displayName: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    const hide = new Set<string>(perm.canEdit ? [] : SENSITIVE_FIELDS);
+    const strip = (o: unknown) =>
+      o && typeof o === 'object'
+        ? Object.fromEntries(
+            Object.entries(o as Record<string, unknown>).filter(([k]) => !hide.has(k)),
+          )
+        : o;
+    return {
+      data: {
+        history,
+        edits: edits.map((e) => {
+          const m = (e.metadata ?? {}) as Record<string, unknown>;
+          return {
+            id: e.id,
+            action: e.action,
+            at: e.createdAt,
+            actor: e.actor,
+            before: strip(m['before']),
+            after: strip(m['after']),
+          };
+        }),
+        next_cursor: null,
+      },
+      error: null,
+    };
   }
 
   /**
@@ -1444,16 +1728,35 @@ export class GenealogyService {
     const perm = await this.effectivePerm(lineageId, userId);
     this.require(perm, 'canView', 'xem ngày giỗ');
     const today = todayVn();
+    const rows = await this.upcomingAnniversaries(lineageId, today, withinDays);
+    return {
+      data: { today, anniversaries: rows.slice(0, limit) },
+      error: null,
+    };
+  }
+
+  /** Các ngày giỗ sắp tới của một dòng họ, sắp theo ngày (không kiểm quyền). */
+  private async upcomingAnniversaries(
+    lineageId: string,
+    today: string,
+    withinDays?: number,
+  ) {
     const deceased = await this.prisma.familyPerson.findMany({
       where: {
         lineageId,
         deletedAt: null,
-        dateOfDeath: { not: null },
+        OR: [
+          { dateOfDeath: { not: null } },
+          { deathLunarDay: { not: null }, deathLunarMonth: { not: null } },
+        ],
       },
       select: {
         id: true,
         fullName: true,
         dateOfDeath: true,
+        deathLunarDay: true,
+        deathLunarMonth: true,
+        deathLunarLeap: true,
         burialPlace: true,
       },
       orderBy: { fullName: 'asc' },
@@ -1461,9 +1764,20 @@ export class GenealogyService {
     });
     const rows = [];
     for (const p of deceased) {
-      if (!p.dateOfDeath) continue;
-      const deathSolar = toVnDateString(p.dateOfDeath);
-      const deathLunar = solarStrToLunar(deathSolar);
+      const deathSolar = p.dateOfDeath ? toVnDateString(p.dateOfDeath) : null;
+      // Ngày mất âm nhập tay được ưu tiên: đó là ngày gia đình làm giỗ.
+      const deathLunar =
+        p.deathLunarDay && p.deathLunarMonth
+          ? {
+              day: p.deathLunarDay,
+              month: p.deathLunarMonth,
+              year: deathSolar ? solarStrToLunar(deathSolar).year : 0,
+              isLeap: p.deathLunarLeap,
+            }
+          : deathSolar
+            ? solarStrToLunar(deathSolar)
+            : null;
+      if (!deathLunar) continue;
       const next = nextAnniversary(deathLunar, today);
       if (!next) continue;
       if (withinDays !== undefined && next.daysUntil > withinDays) continue;
@@ -1482,10 +1796,47 @@ export class GenealogyService {
         a.nextSolar.localeCompare(b.nextSolar) ||
         a.fullName.localeCompare(b.fullName),
     );
-    return {
-      data: { today, anniversaries: rows.slice(0, limit) },
-      error: null,
-    };
+    return rows;
+  }
+
+  /**
+   * Nhắc giỗ hằng ngày (cron, kiểm toán H4): với mọi dòng họ thật, giỗ còn
+   * đúng 7, 3, 1 hoặc 0 ngày thì báo cho mọi thành viên đã duyệt. dedupKey
+   * theo người mất + ngày giỗ + mốc nên chạy lại trong ngày không gửi trùng.
+   */
+  async sendAnniversaryReminders() {
+    const today = todayVn();
+    const lineages = await this.prisma.lineage.findMany({
+      where: { deletedAt: null, id: { not: DEMO_LINEAGE_ID } },
+      select: { id: true, name: true },
+    });
+    let sent = 0;
+    for (const l of lineages) {
+      const rows = (await this.upcomingAnniversaries(l.id, today, 7)).filter((r) =>
+        REMINDER_DAYS.includes(r.daysUntil),
+      );
+      if (!rows.length) continue;
+      const members = await this.prisma.lineageMembership.findMany({
+        where: { lineageId: l.id, status: 'approved' },
+        select: { userId: true },
+      });
+      const items = rows.flatMap((r) =>
+        members.map((m) => ({
+          userId: m.userId,
+          type: 'anniversary_reminder',
+          title:
+            r.daysUntil === 0
+              ? `Hôm nay là giỗ ${r.fullName}`
+              : `Còn ${r.daysUntil} ngày đến giỗ ${r.fullName}`,
+          body: `Ngày ${r.deathLunar} âm lịch, tức ${r.nextSolar.split('-').reverse().join('/')}${r.burialPlace ? ` · Phần mộ: ${r.burialPlace}` : ''}`,
+          data: { lineageId: l.id, personId: r.personId, nextSolar: r.nextSolar },
+          dedupKey: `gio:${r.personId}:${r.nextSolar}:${r.daysUntil}:user:${m.userId}`,
+        })),
+      );
+      const res = await this.notifications.notifyMany(items);
+      sent += res.data.created;
+    }
+    return { data: { today, lineages: lineages.length, sent }, error: null };
   }
 
   // ------------------------------------------------- liên kết tài khoản

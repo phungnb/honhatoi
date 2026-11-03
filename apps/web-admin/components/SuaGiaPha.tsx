@@ -20,8 +20,12 @@ interface Person {
   dateOfBirth?: string | null;
   dateOfDeath?: string | null;
   burialPlace?: string | null;
+  deathLunarDay?: number | null;
+  deathLunarMonth?: number | null;
+  deathLunarLeap?: boolean;
   generation?: number | null;
   branch?: string | null;
+  updatedAt?: string;
 }
 
 type Relation = "child" | "spouse" | "parent";
@@ -60,6 +64,8 @@ const EMPTY = {
   gender: "male",
   birthYear: "",
   dateOfDeath: "",
+  lunarDeath: "",
+  lunarLeap: false,
   burialPlace: "",
   branch: "",
   relation: "child" as Relation,
@@ -114,13 +120,28 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     });
   }, [form.fullName, form.birthYear, persons, editing]);
 
+  /** "15/8" → { day: 15, month: 8 }; sai dạng → null. */
+  function parseLunar(v: string) {
+    const m = /^\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*$/.exec(v);
+    if (!m) return null;
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    return day >= 1 && day <= 30 && month >= 1 && month <= 12 ? { day, month } : null;
+  }
+
   function personBody() {
     const y = form.birthYear.trim();
+    const lunar = parseLunar(form.lunarDeath);
     return {
       fullName: form.fullName.trim(),
       gender: form.gender,
       ...(y ? { dateOfBirth: `${y}-01-01`, birthYearOnly: true } : {}),
       ...(form.dateOfDeath ? { dateOfDeath: form.dateOfDeath } : {}),
+      ...(lunar
+        ? { deathLunarDay: lunar.day, deathLunarMonth: lunar.month, deathLunarLeap: form.lunarLeap }
+        : editing?.deathLunarDay
+          ? { deathLunarDay: null, deathLunarMonth: null, deathLunarLeap: false }
+          : {}),
       ...(form.burialPlace.trim() ? { burialPlace: form.burialPlace.trim() } : {}),
       ...(form.branch.trim() ? { branch: form.branch.trim() } : {}),
     };
@@ -130,6 +151,8 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     if (!form.fullName.trim()) return setError("Nhập họ tên.");
     if (form.birthYear && !/^\d{4}$/.test(form.birthYear.trim()))
       return setError("Năm sinh gồm 4 số, VD 1958.");
+    if (form.lunarDeath.trim() && !parseLunar(form.lunarDeath))
+      return setError("Ngày mất âm lịch ghi dạng ngày/tháng, VD 15/8.");
     if (!editing && persons.length > 0 && !form.relatedId)
       return setError("Chọn người có quan hệ với người mới.");
     if (dups.length > 0 && !dupOk)
@@ -140,7 +163,11 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     try {
       let done: string;
       if (editing) {
-        await patch(`/genealogy/persons/${editing.id}`, personBody());
+        await patch(`/genealogy/persons/${editing.id}`, {
+          ...personBody(),
+          // Có người sửa chen giữa thì máy chủ trả lỗi thay vì ghi đè.
+          ...(editing.updatedAt ? { expectedUpdatedAt: editing.updatedAt } : {}),
+        });
         done = `Đã lưu ${form.fullName.trim()}.`;
       } else {
         const related = persons.find((p) => p.id === form.relatedId);
@@ -202,6 +229,8 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
       gender: p.gender ?? "male",
       birthYear: year(p.dateOfBirth),
       dateOfDeath: p.dateOfDeath ? p.dateOfDeath.slice(0, 10) : "",
+      lunarDeath: p.deathLunarDay && p.deathLunarMonth ? `${p.deathLunarDay}/${p.deathLunarMonth}` : "",
+      lunarLeap: !!p.deathLunarLeap,
       burialPlace: p.burialPlace ?? "",
       branch: p.branch ?? "",
     });
@@ -341,7 +370,28 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
             />
           </label>
         </div>
-        {form.dateOfDeath && (
+        <div className="btn-row" style={{ flexWrap: "wrap", gap: 12, marginTop: 12, alignItems: "flex-end" }}>
+          <label className="muted-text" style={{ flex: "1 1 160px" }}>
+            Ngày mất âm lịch (ngày giỗ), VD 15/8
+            <input
+              style={inputStyle}
+              value={form.lunarDeath}
+              onChange={(e) => set("lunarDeath")(e.target.value)}
+              placeholder="ngày/tháng"
+              inputMode="numeric"
+              maxLength={5}
+            />
+          </label>
+          <label className="muted-text" style={{ display: "flex", gap: 8, alignItems: "center", paddingBottom: 10 }}>
+            <input
+              type="checkbox"
+              checked={form.lunarLeap}
+              onChange={(e) => setForm((f) => ({ ...f, lunarLeap: e.target.checked }))}
+            />
+            Tháng nhuận
+          </label>
+        </div>
+        {(form.dateOfDeath || form.lunarDeath) && (
           <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
             Phần mộ ở đâu
             <input

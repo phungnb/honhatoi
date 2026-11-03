@@ -33,6 +33,10 @@ interface Person {
   email?: string | null;
   education?: string | null;
   hobbies?: string | null;
+  deathLunarDay?: number | null;
+  deathLunarMonth?: number | null;
+  deathLunarLeap?: boolean;
+  updatedAt?: string;
   accountLink?: { status: string; mine: boolean; displayName: string } | null;
 }
 
@@ -56,6 +60,7 @@ export default function HoSoNguoi({
   const [editing, setEditing] = useState(false);
   const [reload, setReload] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     setP(null);
@@ -82,6 +87,12 @@ export default function HoSoNguoi({
         ["Vai trò trong họ", p.roleInLineage],
         ["Sinh", fmtDate(p.dateOfBirth, p.birthYearOnly)],
         ["Mất", fmtDate(p.dateOfDeath)],
+        [
+          "Giỗ (âm lịch)",
+          p.deathLunarDay && p.deathLunarMonth
+            ? `${p.deathLunarDay}/${p.deathLunarMonth}${p.deathLunarLeap ? " nhuận" : ""}`
+            : null,
+        ],
         ["Phần mộ", p.burialPlace],
         ["Quê quán", p.hometown],
         ["Nơi ở", p.currentPlace],
@@ -143,6 +154,7 @@ export default function HoSoNguoi({
               />
             )}
             {msg && <p style={{ color: "var(--brand)", marginTop: 12 }}>{msg}</p>}
+            {showHistory && !demo && <LichSu personId={p.id} key={reload} />}
             {editing && (
               <SuaHoSo
                 person={p}
@@ -160,6 +172,11 @@ export default function HoSoNguoi({
           {p && !demo && !editing && (
             <button className="btn" onClick={() => { setMsg(null); setEditing(true); }}>
               Sửa / đề xuất sửa
+            </button>
+          )}
+          {p && !demo && (
+            <button className="btn" onClick={() => setShowHistory((v) => !v)}>
+              {showHistory ? "Ẩn lịch sử" : "Lịch sử thay đổi"}
             </button>
           )}
           <button className="btn" onClick={onClose}>
@@ -226,7 +243,8 @@ function SuaHoSo({
     try {
       const b = await patch<{ data?: { change_request?: unknown } }>(
         `/genealogy/persons/${person.id}`,
-        changed,
+        // Có người sửa chen giữa thì máy chủ báo lỗi thay vì ghi đè.
+        person.updatedAt ? { ...changed, expectedUpdatedAt: person.updatedAt } : changed,
       );
       onDone(
         b?.data?.change_request
@@ -334,6 +352,71 @@ function NhanHoSo({ person, onDone }: { person: Person; onDone: (msg: string) =>
         </button>
       )}
       {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
+    </div>
+  );
+}
+
+interface Edit {
+  id: string;
+  action: string;
+  at: string;
+  actor?: { displayName: string } | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
+
+const FIELD_LABEL: Record<string, string> = {
+  ...Object.fromEntries(FIELDS.map((f) => [f.key, f.label.replace(/ \(.*\)$/, "")])),
+  gender: "Giới tính",
+  generation: "Đời",
+  branch: "Chi",
+  birthYearOnly: "Chỉ biết năm sinh",
+  deathLunarDay: "Ngày giỗ (âm)",
+  deathLunarMonth: "Tháng giỗ (âm)",
+  deathLunarLeap: "Tháng nhuận",
+  bloodType: "Nhóm máu",
+};
+
+const ACTION_LABEL: Record<string, string> = {
+  "genealogy.person.update": "Sửa",
+  "genealogy.person.delete": "Xóa khỏi cây",
+  "genealogy.person.restore": "Khôi phục",
+};
+
+const show = (v: unknown) =>
+  v === null || v === undefined || v === "" ? "(trống)" : typeof v === "boolean" ? (v ? "Có" : "Không") : String(v);
+
+/** Lịch sử sửa hồ sơ: ai sửa, lúc nào, giá trị trước → sau (kiểm toán H1). */
+function LichSu({ personId }: { personId: string }) {
+  const [edits, setEdits] = useState<Edit[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    get<{ data?: { edits?: Edit[] } }>(`/genealogy/persons/${personId}/history`)
+      .then((b) => setEdits(b?.data?.edits ?? []))
+      .catch((e) => setError(apiMessage(e)));
+  }, [personId]);
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <h3 className="card-title">Lịch sử thay đổi</h3>
+      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+      {edits && edits.length === 0 && (
+        <p className="muted-text">Chưa có thay đổi nào được ghi lại.</p>
+      )}
+      {edits?.map((e) => (
+        <div key={e.id} style={{ borderTop: "1px solid var(--border)", padding: "8px 0" }}>
+          <p className="muted-text">
+            {fmtDate(e.at)} · {ACTION_LABEL[e.action] ?? e.action}
+            {e.actor?.displayName ? ` · ${e.actor.displayName}` : ""}
+          </p>
+          {Object.keys(e.after ?? {}).map((k) => (
+            <p key={k}>
+              {FIELD_LABEL[k] ?? k}: <s className="muted-text">{show(e.before?.[k])}</s> → {show(e.after?.[k])}
+            </p>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

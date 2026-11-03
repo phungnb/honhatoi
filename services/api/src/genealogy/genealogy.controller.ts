@@ -131,6 +131,11 @@ export class GenealogyController {
     return this.genealogy.removePerson(id, userId);
   }
 
+  @Post('persons/:id/restore')
+  restorePerson(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.restorePerson(id, userId);
+  }
+
   @Post('lineages/:lineageId/relationships')
   @UseGuards(LineageGuard)
   createRelationship(
@@ -236,9 +241,14 @@ export class GenealogyController {
     return this.genealogy.rejectProposal(id, reviewerId, dto?.note);
   }
 
+  /** Body { note }: lý do hoặc nguồn tư liệu khi phản đối (bắt buộc). */
   @Post('proposals/:id/dispute')
-  disputeProposal(@Param('id') id: string, @CurrentUserId() reviewerId: string) {
-    return this.genealogy.disputeProposal(id, reviewerId);
+  disputeProposal(
+    @Param('id') id: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: ReviewProposalDto,
+  ) {
+    return this.genealogy.disputeProposal(id, userId, dto?.note);
   }
 
   @Get('persons/:id/history')
