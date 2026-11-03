@@ -61,6 +61,7 @@ export default function Sidebar() {
         { href: "/app/gia-pha", label: "Gia phả", short: "Gia phả", mobile: true, icon: "gia-pha" },
         { href: "/app/tin-nhan", label: "Tin nhắn", short: "Tin nhắn", mobile: true, icon: "tin-nhan" },
         { href: "/app/dong-ho", label: "Dòng họ", short: "Dòng họ", mobile: true, icon: "dong-ho" },
+        { href: "/app/lich-am", label: "Lịch âm dương", short: "Lịch", mobile: false, icon: "lich" },
         {
           href: "/app/thong-bao",
           label: unread > 0 ? `Thông báo (${unread})` : "Thông báo",

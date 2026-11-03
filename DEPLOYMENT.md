@@ -29,6 +29,21 @@ Dự án dùng 2 Vercel project riêng (monorepo):
   cách nhau bằng dấu phẩy) để bật đăng nhập Google. Không đặt thì
   `/auth/google` trả 503.
 - **Giới hạn:** WebSocket chat realtime KHÔNG chạy trên serverless. Các API REST chạy bình thường.
+- **Ảnh chat** (`POST /chat/conversations/:id/images`, multipart): cần chỗ lưu.
+  - Vercel: tạo kho Blob **Private** và gắn vào project `honhatoi-api`
+    (Vercel tự thêm `BLOB_READ_WRITE_TOKEN`). Ảnh không có URL công khai;
+    web đọc qua `GET /api/v1/files/...` với chữ ký HMAC hết hạn sau 24–48 giờ.
+  - VPS: đặt `STORAGE_DIR=/duong/dan/uploads` (driver đĩa), nhớ sao lưu thư mục.
+  - Không cấu hình gì: gửi ảnh trả 503 `FILE_STORAGE_OFF`, chat chữ vẫn chạy.
+  - Trình duyệt nén ảnh về cạnh dài 1600 px trước khi gửi; máy chủ nhận tối đa
+    4 MB (Vercel giới hạn 4,5 MB/request) và chỉ nhận JPG/PNG/WebP/GIF (kiểm byte đầu tệp).
+- **Nhắc giỗ** (`vercel.json` → cron `0 0 * * *` = 7:00 giờ Việt Nam):
+  - `CRON_SECRET` bắt buộc, thiếu thì cron trả 503 và không ai được nhắc.
+  - Thông báo đẩy Web Push: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+    `VAPID_SUBJECT` (tạo bằng `npx web-push generate-vapid-keys`). Thiếu khóa thì
+    chỉ có thông báo trong app. Người dùng bật ở trang Cá nhân hoặc Lịch âm dương.
+  - Chạy được trên Chrome/Edge/Firefox/Android; iPhone cần iOS 16.4+ và mở từ
+    biểu tượng ngoài Màn hình chính. Vỏ app Capacitor chưa nhận push (cần FCM).
 
 ## honhatoi-web-admin (web quản trị)
 

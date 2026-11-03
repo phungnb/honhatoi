@@ -1719,3 +1719,173 @@ blockquote.trich-dan {
 /* Nút lên/xuống sắp xếp danh sách người */
 .btn.btn-icon { padding-left: 10px; padding-right: 10px; min-width: 36px; }
 .btn.btn-icon:disabled { opacity: 0.3; cursor: default; }
+
+/* Ảnh trong chat */
+.msg-anh {
+  display: block;
+  padding: 0;
+  margin: 2px 0 4px;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.msg-anh img {
+  display: block;
+  max-width: min(260px, 100%);
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.anh-cho-gui {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex: none;
+}
+.chat-input .icon-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.xem-anh {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+}
+.xem-anh img {
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+/* Lịch âm dương */
+.lich-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lich-luoi {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 12px;
+}
+.lich-thu {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, var(--text-2));
+  padding: 4px 0;
+}
+.lich-thu.cn,
+.lich-o.cn .lich-duong {
+  color: var(--danger);
+}
+.lich-o {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  padding: 4px 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.lich-o:hover {
+  border-color: var(--border);
+}
+.lich-o.hom-nay {
+  border-color: var(--brand);
+}
+.lich-o.chon {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.lich-o.chon .lich-duong,
+.lich-o.chon .lich-am {
+  color: var(--on-brand);
+}
+.lich-duong {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.lich-am {
+  font-size: 11px;
+  opacity: 0.75;
+}
+.lich-am.ram {
+  font-weight: 700;
+  opacity: 1;
+  color: var(--warm, #e8b86d);
+}
+.lich-cham {
+  position: absolute;
+  bottom: 3px;
+  display: flex;
+  gap: 3px;
+}
+.cham-gio,
+.cham-le {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.cham-gio {
+  background: var(--warm, #e8b86d);
+}
+.cham-le {
+  background: var(--danger);
+}
+.lich-chi-tiet {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.lich-am-to {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.lich-am-to .n {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--warm, #e8b86d);
+}
+.doi-am label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.doi-am .field {
+  margin-top: 0;
+}

@@ -3,6 +3,7 @@
 /** Giỗ sắp tới — tính theo âm lịch, ngày dương năm sau tự dời. */
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { get } from "@/lib/api";
 
 interface Anniversary {
@@ -44,7 +45,14 @@ export default function GioSapToi({
 
   return (
     <div className="card section-gap">
-      <h2 className="card-title">Giỗ sắp tới</h2>
+      <h2 className="card-title">
+        Giỗ sắp tới
+        {!demo && (
+          <Link href="/app/lich-am" className="sub" style={{ float: "right", fontWeight: 400 }}>
+            Xem lịch
+          </Link>
+        )}
+      </h2>
       {items === null ? (
         <p className="muted-text">Đang tải…</p>
       ) : items.length === 0 ? (

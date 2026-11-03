@@ -319,6 +319,9 @@ export default function TrangChu() {
         <Link className="chip" href="/app/gia-pha#vai-ve">
           Tra vai vế
         </Link>
+        <Link className="chip" href="/app/lich-am">
+          Lịch âm dương
+        </Link>
         {manages && current && (
           <Link className="chip" href={`/quan-ly/${current.id}`}>
             Quản lý dòng họ

@@ -16,6 +16,7 @@ import MatKhauEmail from "@/components/MatKhauEmail";
 import XoaTaiKhoan from "@/components/XoaTaiKhoan";
 import DoiTen from "@/components/DoiTen";
 import CoChu from "@/components/CoChu";
+import BatThongBao from "@/components/BatThongBao";
 
 const inputStyle: CSSProperties = {
   display: "block",
@@ -145,6 +146,8 @@ export default function TaiKhoanPage() {
       </div>
 
       <CoChu />
+
+      <BatThongBao />
 
       <DoiTen />
 

@@ -10,7 +10,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { del, get, getAccessToken, patch, post } from "@/lib/api";
+import { apiUrl, del, get, getAccessToken, patch, post, upload } from "@/lib/api";
+import { nenAnh, type AnhDaNen } from "@/lib/anh";
 import { apiMessage } from "@/lib/errors";
 import { useLineages } from "@/lib/lineage";
 import { isLineageAdmin } from "@/lib/roles";
@@ -34,7 +35,13 @@ interface Message {
   pinnedAt?: string | null;
   replyTo?: { id: string; senderName: string | null; content: string | null; recalled: boolean } | null;
   reactions?: Reaction[];
+  type?: string;
+  attachments?: { id: string; url: string; mimeType: string; width: number | null; height: number | null }[];
 }
+
+/** Nội dung ngắn để xem trước (danh sách, ghim, trả lời): tin ảnh không chữ hiện "[Ảnh]". */
+const preview = (m: { content: string | null; type?: string; attachments?: unknown[] }) =>
+  m.content || (m.type === "image" || m.attachments?.length ? "[Ảnh]" : "");
 
 interface Conversation {
   id: string;
@@ -255,7 +262,7 @@ export default function TinNhanPage() {
         <span className="t2">
           {c.lastMessage
             ? `${c.lastMessage.senderId === me ? "Bạn" : c.lastMessage.senderName ?? ""}: ${
-                c.lastMessage.recalled ? "đã thu hồi" : c.lastMessage.content ?? ""
+                c.lastMessage.recalled ? "đã thu hồi" : preview(c.lastMessage)
               }`
             : kind(c) !== "direct" && c.members?.length
               ? `${c.members.length} thành viên · Chưa có tin nhắn`
@@ -524,6 +531,34 @@ function PhongChat({
   const [err, setErr] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  /** Ảnh đã chọn, đã nén, chờ gửi (kèm chú thích là ô nhập chữ). */
+  const [anh, setAnh] = useState<(AnhDaNen & { preview: string }) | null>(null);
+  const [xemAnh, setXemAnh] = useState<string | null>(null);
+
+  async function chonAnh(f: File | undefined) {
+    if (!f) return;
+    setErr(null);
+    try {
+      const a = await nenAnh(f);
+      setEditing(null);
+      setAnh((old) => {
+        if (old) URL.revokeObjectURL(old.preview);
+        return { ...a, preview: URL.createObjectURL(a.blob) };
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Không đọc được ảnh");
+    } finally {
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  function boAnh() {
+    setAnh((old) => {
+      if (old) URL.revokeObjectURL(old.preview);
+      return null;
+    });
+  }
   const lastId = useRef<string>("");
 
   const load = useCallback(async () => {
@@ -572,11 +607,21 @@ function PhongChat({
 
   async function send() {
     const content = text.trim();
-    if (!content) return;
+    if (!content && !anh) return;
     setSending(true);
     setErr(null);
     try {
-      if (editing) {
+      if (anh && !editing) {
+        const f = new FormData();
+        f.append("clientMessageId", crypto.randomUUID());
+        if (content) f.append("content", content);
+        if (replyTo) f.append("replyToId", replyTo.id);
+        f.append("width", String(anh.width));
+        f.append("height", String(anh.height));
+        f.append("file", anh.blob, anh.type === "image/gif" ? "anh.gif" : "anh.jpg");
+        await upload(`/chat/conversations/${conv.id}/images`, f);
+        boAnh();
+      } else if (editing) {
         await patch(`/chat/messages/${editing.id}`, { content });
       } else {
         await post(`/chat/conversations/${conv.id}/messages`, {
@@ -695,7 +740,7 @@ function PhongChat({
                     <span className="sub">
                       {m.senderId === me ? "Bạn" : m.senderName} · {new Date(m.createdAt).toLocaleString("vi-VN")}
                     </span>
-                    <span style={{ display: "block" }}>{m.content}</span>
+                    <span style={{ display: "block" }}>{preview(m)}</span>
                   </span>
                 </button>
               ))}
@@ -709,7 +754,7 @@ function PhongChat({
           <button className="ghim-bar-main" onClick={() => setShowPinned((v) => !v)}>
             <span className="badge brand">Ghim {pinned.length > 1 ? `(${pinned.length})` : ""}</span>
             <span className="ghim-text">
-              {pinned[0].senderName}: {pinned[0].content}
+              {pinned[0].senderName}: {preview(pinned[0])}
             </span>
           </button>
           {showPinned && (
@@ -718,7 +763,7 @@ function PhongChat({
                 <div key={m.id} className="list-item">
                   <button className="grow link-plain" onClick={() => jumpTo(m.id)}>
                     <span className="sub">{m.senderName}</span>
-                    <span style={{ display: "block" }}>{m.content}</span>
+                    <span style={{ display: "block" }}>{preview(m)}</span>
                   </button>
                   {canPin && (
                     <button className="btn chip" onClick={() => void run(() => post(`/chat/messages/${m.id}/pin`, { pinned: false }))}>
@@ -761,12 +806,35 @@ function PhongChat({
                     }}
                   >
                     <strong>{m.replyTo.senderName}</strong>
-                    <span>{m.replyTo.recalled ? "Tin nhắn đã thu hồi" : m.replyTo.content}</span>
+                    <span>{m.replyTo.recalled ? "Tin nhắn đã thu hồi" : m.replyTo.content || "[Ảnh]"}</span>
                   </button>
                 )}
-                <div className="msg-text" style={{ whiteSpace: "pre-wrap", fontStyle: m.recalled ? "italic" : undefined }}>
-                  {m.recalled ? "Tin nhắn đã thu hồi" : m.content}
-                </div>
+                {!m.recalled &&
+                  m.attachments?.map((a) => (
+                    <button
+                      key={a.id}
+                      className="msg-anh"
+                      aria-label="Xem ảnh"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setXemAnh(apiUrl(a.url));
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={apiUrl(a.url)}
+                        alt="Ảnh gửi trong cuộc trò chuyện"
+                        loading="lazy"
+                        width={a.width ?? undefined}
+                        height={a.height ?? undefined}
+                      />
+                    </button>
+                  ))}
+                {(m.recalled || m.content) && (
+                  <div className="msg-text" style={{ whiteSpace: "pre-wrap", fontStyle: m.recalled ? "italic" : undefined }}>
+                    {m.recalled ? "Tin nhắn đã thu hồi" : m.content}
+                  </div>
+                )}
                 <div className="sub" style={{ textAlign: "right" }}>
                   {m.pinnedAt && !m.recalled ? "Đã ghim · " : ""}
                   {m.editedAt && !m.recalled ? "đã sửa · " : ""}
@@ -819,16 +887,18 @@ function PhongChat({
                         {m.pinnedAt ? "Bỏ ghim" : "Ghim"}
                       </button>
                     )}
-                    <button
-                      className="btn chip"
-                      onClick={() => {
-                        void navigator.clipboard?.writeText(m.content ?? "").catch(() => undefined);
-                        setSelected(null);
-                      }}
-                    >
-                      Sao chép
-                    </button>
-                    {mine && (
+                    {m.content && (
+                      <button
+                        className="btn chip"
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(m.content ?? "").catch(() => undefined);
+                          setSelected(null);
+                        }}
+                      >
+                        Sao chép
+                      </button>
+                    )}
+                    {mine && m.type !== "image" && (
                       <button className="btn chip" onClick={() => pick(m, "edit")}>
                         Sửa
                       </button>
@@ -857,6 +927,16 @@ function PhongChat({
       </div>
 
       <div className="chat-input-wrap">
+        {anh && (
+          <div className="chat-context">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={anh.preview} alt="Ảnh sắp gửi" className="anh-cho-gui" />
+            <span className="grow sub">Ảnh sẵn sàng gửi. Có thể gõ thêm chú thích.</span>
+            <button className="btn chip" aria-label="Bỏ ảnh" onClick={boAnh}>
+              ✕
+            </button>
+          </div>
+        )}
         {(replyTo || editing) && (
           <div className="chat-context">
             <span className="grow">
@@ -866,7 +946,7 @@ function PhongChat({
                 <>
                   <strong>Trả lời {replyTo!.senderId === me ? "chính bạn" : replyTo!.senderName}</strong>
                   <span className="sub" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {replyTo!.content}
+                    {preview(replyTo!)}
                   </span>
                 </>
               )}
@@ -888,6 +968,26 @@ function PhongChat({
           <p className="muted-text chat-input">Bạn đã chặn người này. Bỏ chặn để nhắn tiếp.</p>
         ) : (
           <div className="chat-input">
+            {!editing && (
+              <>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => void chonAnh(e.target.files?.[0])}
+                />
+                <button
+                  className="btn chip icon-btn"
+                  aria-label="Gửi ảnh"
+                  title="Gửi ảnh"
+                  disabled={sending}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <BieuTuong ten="anh" size={20} />
+                </button>
+              </>
+            )}
             <textarea
               ref={input}
               className="field"
@@ -900,12 +1000,12 @@ function PhongChat({
                   void send();
                 }
               }}
-              placeholder="Nhắn tin…"
+              placeholder={anh ? "Chú thích (tùy chọn)…" : "Nhắn tin…"}
               style={{ marginTop: 0, resize: "none" }}
             />
             <button
               className="sendbtn"
-              disabled={sending || !text.trim()}
+              disabled={sending || (!text.trim() && !anh)}
               onClick={() => void send()}
               aria-label={editing ? "Lưu" : "Gửi"}
               title={editing ? "Lưu" : "Gửi"}
@@ -915,6 +1015,20 @@ function PhongChat({
           </div>
         )}
       </div>
+      {xemAnh && (
+        <div className="xem-anh" role="dialog" aria-label="Xem ảnh" onClick={() => setXemAnh(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={xemAnh} alt="Ảnh phóng to" />
+          <div className="btn-row" onClick={(e) => e.stopPropagation()}>
+            <a className="btn" href={xemAnh} target="_blank" rel="noreferrer">
+              Mở ảnh gốc
+            </a>
+            <button className="btn primary" onClick={() => setXemAnh(null)}>
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
