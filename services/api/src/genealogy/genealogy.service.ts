@@ -378,27 +378,46 @@ export class GenealogyService {
     }
 
     let rootId = opts.rootPersonId;
+    let starts: string[];
     if (rootId) {
       if (!byId.has(rootId))
         throw new NotFoundException({
           code: 'PERSON_NOT_FOUND',
           message: 'Không tìm thấy người làm gốc cây',
         });
+      starts = [rootId];
     } else {
+      // Không chỉ định gốc: lấy mọi người không có cha mẹ trong cây làm điểm
+      // bắt đầu, để cây không phụ thuộc thứ tự bản ghi trong DB (trước đây
+      // chỉ lấy người đầu tiên, có lúc là vợ/chồng của cụ tổ nên mất cả cây).
+      const descendants = (id: string) => {
+        const seen = new Set<string>();
+        const st = [id];
+        while (st.length) for (const c of childrenOf.get(st.pop()!) ?? []) if (!seen.has(c)) (seen.add(c), st.push(c));
+        return seen.size;
+      };
       const roots = persons
         .filter((p) => !hasParent.has(p.id))
-        .sort((a, b) => (a.generation ?? 999) - (b.generation ?? 999));
-      rootId = roots[0]?.id;
+        .map((p) => ({ p, n: descendants(p.id) }))
+        .sort(
+          (a, b) =>
+            (a.p.generation ?? 999) - (b.p.generation ?? 999) ||
+            b.n - a.n ||
+            (a.p.sortOrder ?? 1e9) - (b.p.sortOrder ?? 1e9) ||
+            a.p.createdAt.getTime() - b.p.createdAt.getTime(),
+        );
+      rootId = roots[0]?.p.id;
       if (!rootId)
         return {
           data: { root: null, persons: [], relationships: [], has_more: false },
           error: null,
         };
+      starts = roots.map((r) => r.p.id);
     }
 
-    const depth = new Map<string, number>([[rootId, 0]]);
-    const queue: string[] = [rootId];
-    const included = new Set<string>([rootId]);
+    const depth = new Map<string, number>(starts.map((id) => [id, 0]));
+    const queue: string[] = [...starts];
+    const included = new Set<string>(starts);
     let hasMore = false;
     while (queue.length > 0) {
       const pid = queue.shift()!;
