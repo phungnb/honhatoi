@@ -8,9 +8,12 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ChatService } from './chat.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ChatService, MAX_CHAT_IMAGE_BYTES } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
@@ -76,6 +79,21 @@ export class ChatController {
     @Body() dto: SendMessageDto,
   ) {
     return this.chat.sendMessage(id, userId, dto);
+  }
+
+  @Post('conversations/:id/images')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_CHAT_IMAGE_BYTES, files: 1, fields: 10 },
+    }),
+  )
+  sendImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUserId() userId: string,
+    @UploadedFile() file: { buffer: Buffer; size: number; originalname?: string } | undefined,
+    @Body() body: Record<string, string>,
+  ) {
+    return this.chat.sendImage(id, userId, file, body ?? {});
   }
 
   @Patch('messages/:id')

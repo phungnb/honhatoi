@@ -13,6 +13,8 @@ import { PostsModule } from './posts/posts.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
 import { HistoryModule } from './history/history.module';
+import { StorageModule } from './storage/storage.module';
+import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { HistoryModule } from './history/history.module';
     ReportsModule,
     AuditModule,
     HistoryModule,
+    StorageModule,
+    PushModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

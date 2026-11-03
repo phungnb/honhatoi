@@ -8,6 +8,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatRoomType, LineageRole, UserStatus } from '@prisma/client';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { StorageService, sniffImage } from '../storage/storage.service';
+import { randomUUID } from 'crypto';
+
+/** Ảnh chat tối đa 4 MB sau khi trình duyệt đã nén (Vercel giới hạn 4,5 MB/request). */
+export const MAX_CHAT_IMAGE_BYTES = 4 * 1024 * 1024;
 
 /**
  * ChatService — triển khai đầy đủ module Chat.
@@ -38,6 +43,9 @@ const MESSAGE_INCLUDE = {
     },
   },
   reactions: { select: { emoji: true, userId: true } },
+  attachments: {
+    select: { id: true, storageKey: true, mimeType: true, fileName: true, width: true, height: true },
+  },
 } as const;
 
 /** Số tin ghim tối đa mỗi cuộc trò chuyện. */
@@ -48,7 +56,10 @@ const LINEAGE_ADMIN_ROLES: LineageRole[] = [LineageRole.ADMIN];
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   // ---------------------------------------------------------------- helpers
 
@@ -177,6 +188,14 @@ export class ChatService {
       sender: { displayName: string } | null;
     } | null;
     reactions?: { emoji: string; userId: string }[];
+    attachments?: {
+      id: string;
+      storageKey: string;
+      mimeType: string;
+      fileName: string;
+      width: number | null;
+      height: number | null;
+    }[];
   },
     me?: string,
   ) {
@@ -209,6 +228,16 @@ export class ChatService {
           }
         : null,
       reactions: [...agg.entries()].map(([emoji, v]) => ({ emoji, ...v })),
+      attachments: recalled
+        ? []
+        : (m.attachments ?? []).map((a) => ({
+            id: a.id,
+            url: this.storage.signedPath(a.storageKey),
+            mimeType: a.mimeType,
+            fileName: a.fileName,
+            width: a.width,
+            height: a.height,
+          })),
       pinnedAt: m.pinnedAt ?? null,
       status: m.status,
       editedAt: m.editedAt ?? null,
@@ -591,6 +620,114 @@ export class ChatService {
         message: this.presentMessage(withSender ?? message, senderId),
         duplicate: false,
       },
+      error: null,
+    };
+  }
+
+  /**
+   * POST /chat/conversations/:id/images (multipart: file, clientMessageId,
+   * content?, replyToId?, width?, height?) — gửi một ảnh kèm chú thích.
+   * Kiểm quyền và idempotency như tin văn bản; tệp chỉ được lưu sau khi qua
+   * kiểm tra, rồi mới ghi tin nhắn + đính kèm trong một transaction.
+   */
+  async sendImage(
+    conversationId: string,
+    senderId: string,
+    file: { buffer: Buffer; size: number; originalname?: string } | undefined,
+    fields: { clientMessageId?: string; content?: string; replyToId?: string; width?: string; height?: string },
+  ) {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!fields.clientMessageId || !uuidRe.test(fields.clientMessageId))
+      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: 'Thiếu clientMessageId hợp lệ' });
+    if (fields.replyToId && !uuidRe.test(fields.replyToId))
+      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: 'replyToId không hợp lệ' });
+    const conv = await this.requireConversation(conversationId);
+    await this.requireActiveMember(conversationId, senderId);
+    if (conv.type === ChatRoomType.DIRECT) {
+      const peer = await this.prisma.conversationMember.findFirst({
+        where: { conversationId, NOT: { userId: senderId } },
+        select: { userId: true },
+      });
+      if (peer) await this.requireNotBlocked(senderId, peer.userId);
+    }
+    const existing = await this.prisma.message.findUnique({
+      where: {
+        conversationId_clientMessageId: { conversationId, clientMessageId: fields.clientMessageId },
+      },
+      include: MESSAGE_INCLUDE,
+    });
+    if (existing)
+      return { data: { message: this.presentMessage(existing, senderId), duplicate: true }, error: null };
+
+    if (!file?.buffer?.length)
+      throw new BadRequestException({ code: 'FILE_REQUIRED', message: 'Chưa chọn ảnh' });
+    if (file.size > MAX_CHAT_IMAGE_BYTES)
+      throw new BadRequestException({ code: 'FILE_TOO_LARGE', message: 'Ảnh quá 4 MB' });
+    const kind = sniffImage(file.buffer);
+    if (!kind)
+      throw new BadRequestException({
+        code: 'FILE_TYPE_NOT_ALLOWED',
+        message: 'Chỉ nhận ảnh JPG, PNG, WebP hoặc GIF',
+      });
+    if (fields.replyToId) {
+      const target = await this.prisma.message.findUnique({ where: { id: fields.replyToId } });
+      if (!target || target.conversationId !== conversationId)
+        throw new BadRequestException({
+          code: 'INVALID_REPLY_TARGET',
+          message: 'Tin nhắn được trả lời không thuộc cuộc trò chuyện này',
+        });
+    }
+    const dim = (v?: string) => {
+      const n = Number(v);
+      return Number.isInteger(n) && n > 0 && n <= 20000 ? n : null;
+    };
+    const content = fields.content?.trim().slice(0, 2000) || null;
+    const key = `chat/${conversationId}/${randomUUID()}.${kind.ext}`;
+    await this.storage.put(key, file.buffer, kind.mime);
+
+    const sender = await this.prisma.user.findUnique({ where: { id: senderId } });
+    let message;
+    try {
+      message = await this.prisma.$transaction(async (tx) => {
+        const m = await tx.message.create({
+          data: {
+            conversationId,
+            senderId,
+            senderNameSnapshot: sender?.displayName ?? null,
+            clientMessageId: fields.clientMessageId as string,
+            type: 'image',
+            content,
+            replyToId: fields.replyToId,
+          },
+        });
+        await tx.messageAttachment.create({
+          data: {
+            messageId: m.id,
+            storageKey: key,
+            fileName: `anh.${kind.ext}`,
+            mimeType: kind.mime,
+            sizeBytes: BigInt(file.size),
+            width: dim(fields.width),
+            height: dim(fields.height),
+          },
+        });
+        await tx.chatConversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+        return m;
+      });
+    } catch (e) {
+      // Ghi DB lỗi (kể cả gửi trùng cùng lúc) → bỏ tệp vừa lưu.
+      await this.storage.remove(key);
+      throw e;
+    }
+    const full = await this.prisma.message.findUnique({
+      where: { id: message.id },
+      include: MESSAGE_INCLUDE,
+    });
+    return {
+      data: { message: this.presentMessage(full ?? message, senderId), duplicate: false },
       error: null,
     };
   }

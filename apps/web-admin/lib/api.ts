@@ -96,3 +96,29 @@ export const del = <T>(path: string): Promise<T> =>
 
 export const patch = <T>(path: string, body: unknown): Promise<T> =>
   api<T>(path, { method: "PATCH", body: JSON.stringify(body) });
+
+/** Địa chỉ đầy đủ của một đường dẫn API (vd. URL ký /files/... của ảnh). */
+export const apiUrl = (path: string): string => `${API_URL}${path}`;
+
+/**
+ * Gửi multipart (ảnh). Không đặt Content-Type để trình duyệt tự thêm
+ * boundary. Gặp 401 thì refresh một lần như api().
+ */
+export async function upload<T>(path: string, form: FormData, retried = false): Promise<T> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (res.status === 401 && !retried) {
+    const next = await refreshAccess();
+    if (next) return upload<T>(path, form, true);
+    clearTokens();
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`API ${res.status}: ${body || res.statusText}`);
+  }
+  return (await res.json()) as T;
+}

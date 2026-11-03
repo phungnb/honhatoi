@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { PushService } from '../push/push.service';
 
 export interface NotifyInput {
   userId: string;
@@ -19,7 +20,41 @@ export interface NotifyInput {
  */
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly push?: PushService,
+  ) {}
+
+  /** Trang mở khi bấm thông báo đẩy. */
+  private pushUrl(i: Pick<NotifyInput, 'type'>): string {
+    if (i.type === 'anniversary_reminder') return '/app/lich-am';
+    return '/app/thong-bao';
+  }
+
+  /**
+   * Đẩy thông báo vừa tạo ra điện thoại/trình duyệt (nếu đã bật). Gộp các
+   * mục cùng nội dung để mỗi nhóm chỉ đọc danh sách thiết bị một lần.
+   */
+  private async pushCreated(items: NotifyInput[]) {
+    if (!this.push?.enabled() || items.length === 0) return;
+    const groups = new Map<string, { item: NotifyInput; userIds: string[] }>();
+    for (const i of items) {
+      const k = `${i.type}|${i.title}|${i.body ?? ''}`;
+      const g = groups.get(k) ?? { item: i, userIds: [] };
+      g.userIds.push(i.userId);
+      groups.set(k, g);
+    }
+    await Promise.allSettled(
+      [...groups.values()].map(({ item, userIds }) =>
+        this.push!.sendToUsers(userIds, {
+          title: item.title,
+          body: item.body,
+          url: this.pushUrl(item),
+          tag: item.dedupKey?.replace(/:user:.*$/, '') ?? item.type,
+        }),
+      ),
+    );
+  }
 
   /**
    * Tạo một thông báo (dùng nội bộ, các module khác gọi qua hàm này).
@@ -43,6 +78,7 @@ export class NotificationsService {
           dedupKey: input.dedupKey,
         },
       });
+      await this.pushCreated([{ userId, ...input }]);
       return { data: { notification }, error: null };
     } catch (e) {
       // Race: hai tiến trình cùng tạo một dedupKey → coi như đã gửi.
@@ -84,6 +120,7 @@ export class NotificationsService {
       ),
     );
     const created = results.filter((r) => r.status === 'fulfilled').length;
+    await this.pushCreated(fresh.filter((_, i) => results[i].status === 'fulfilled'));
     return { data: { created }, error: null };
   }
 

@@ -31,6 +31,19 @@ const PATHS: Record<string, React.ReactNode> = {
       <path d="M5 20c1-4 3.9-6 7-6s6 2 7 6" />
     </>
   ),
+  anh: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <circle cx="9" cy="10" r="1.8" />
+      <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
+  lich: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </>
+  ),
   chuong: (
     <>
       <path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16z" />
