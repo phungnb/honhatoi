@@ -25,6 +25,9 @@ interface Person {
   deathLunarDay?: number | null;
   deathLunarMonth?: number | null;
   deathLunarLeap?: boolean;
+  deathLunarText?: string | null;
+  annivSolarDay?: number | null;
+  annivSolarMonth?: number | null;
   generation?: number | null;
   branch?: string | null;
   updatedAt?: string;
@@ -54,19 +57,23 @@ const year = (iso?: string | null) => (iso ? iso.slice(0, 4) : "");
 /** Dữ liệu ngày mất đã lưu → ô "Ngày mất" (ưu tiên âm lịch vì đó là ngày làm giỗ). */
 function deathForm(p: Person) {
   const y = year(p.dateOfDeath);
-  const dead = !!(p.isDeceased || p.dateOfDeath || p.deathLunarDay);
-  if (p.deathLunarDay && p.deathLunarMonth)
-    return {
-      deathCal: "al" as const,
-      deathText: `${p.deathLunarDay}/${p.deathLunarMonth}${y ? `/${y}` : ""}`,
-      lunarLeap: !!p.deathLunarLeap,
-      deceased: dead,
-    };
+  const dead = !!(p.isDeceased || p.dateOfDeath || p.deathLunarDay || p.annivSolarDay);
+  const gio =
+    p.deathLunarDay && p.deathLunarMonth
+      ? { gioCal: "al" as const, gioText: `${p.deathLunarDay}/${p.deathLunarMonth}`, lunarLeap: !!p.deathLunarLeap }
+      : p.annivSolarDay && p.annivSolarMonth
+        ? { gioCal: "dl" as const, gioText: `${p.annivSolarDay}/${p.annivSolarMonth}`, lunarLeap: false }
+        : { gioCal: "al" as const, gioText: "", lunarLeap: false };
+  const base = { ...gio, deceased: dead, gioTouched: false };
+  if (p.deathLunarText) return { ...base, deathCal: "al" as const, deathText: p.deathLunarText };
   if (p.dateOfDeath && !p.deathYearOnly) {
     const [yy, mm, dd] = p.dateOfDeath.slice(0, 10).split("-");
-    return { deathCal: "dl" as const, deathText: `${Number(dd)}/${Number(mm)}/${yy}`, lunarLeap: false, deceased: dead };
+    return { ...base, deathCal: "dl" as const, deathText: `${Number(dd)}/${Number(mm)}/${yy}` };
   }
-  return { deathCal: "al" as const, deathText: y, lunarLeap: false, deceased: dead };
+  // Dữ liệu cũ: ngày âm lưu ở ô giỗ, năm ở năm mất.
+  if (p.deathLunarDay && p.deathLunarMonth)
+    return { ...base, deathCal: "al" as const, deathText: `${p.deathLunarDay}/${p.deathLunarMonth}${y ? `/${y}` : ""}` };
+  return { ...base, deathCal: "al" as const, deathText: y };
 }
 
 /** Chuẩn hoá tên để so trùng: bỏ dấu, gộp khoảng trắng, chữ thường. */
@@ -87,6 +94,9 @@ const EMPTY = {
   deathText: "",
   deceased: false,
   deathDirty: false,
+  gioCal: "al" as "al" | "dl",
+  gioText: "",
+  gioTouched: false,
   lunarLeap: false,
   burialPlace: "",
   branch: "",
@@ -158,6 +168,8 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
   }
 
   function deathError(): string | null {
+    const g = form.gioText.trim();
+    if (g && !/^\d{1,2}\s*\/\s*\d{1,2}$/.test(g)) return "Ngày giỗ ghi dạng ngày/tháng, VD 15/8.";
     const d = parseDeath(form.deathText);
     if (!d) return "Ngày mất ghi dạng ngày/tháng/năm, ngày/tháng hoặc năm.";
     if (form.deathCal === "dl" && d.day && !d.year) return "Ngày mất dương lịch cần có năm.";
@@ -173,18 +185,47 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     const d = parseDeath(form.deathText) ?? {};
     const pad = (n: number) => String(n).padStart(2, "0");
     const solarFull = form.deathCal === "dl" && d.day && d.year;
-    const lunar = form.deathCal === "al" && d.day;
+    const gm = /^(\d{1,2})\s*\/\s*(\d{1,2})$/.exec(form.gioText.trim());
+    const gd = gm ? Number(gm[1]) : null;
+    const gmo = gm ? Number(gm[2]) : null;
     return {
-      isDeceased: form.deceased || !!form.deathText.trim(),
+      isDeceased: form.deceased,
       ...(solarFull
         ? { dateOfDeath: `${d.year}-${pad(d.month!)}-${pad(d.day!)}`, deathYearOnly: false }
         : d.year
           ? { dateOfDeath: `${d.year}-01-01`, deathYearOnly: true }
           : { dateOfDeath: null, deathYearOnly: false }),
-      ...(lunar
-        ? { deathLunarDay: d.day, deathLunarMonth: d.month, deathLunarLeap: form.lunarLeap }
+      deathLunarText: form.deathCal === "al" && d.day ? form.deathText.trim() : null,
+      ...(gd && form.gioCal === "al"
+        ? { deathLunarDay: gd, deathLunarMonth: gmo, deathLunarLeap: form.lunarLeap }
         : { deathLunarDay: null, deathLunarMonth: null, deathLunarLeap: false }),
+      ...(gd && form.gioCal === "dl"
+        ? { annivSolarDay: gd, annivSolarMonth: gmo }
+        : { annivSolarDay: null, annivSolarMonth: null }),
     };
+  }
+
+  /** Ngày mất đổi thì tự điền ngày giỗ (nếu người dùng chưa tự sửa ô giỗ). */
+  function autoGio(cal: "al" | "dl", text: string) {
+    const d = parseDeath(text);
+    if (!d || !d.day) return;
+    if (cal === "al") {
+      setForm((f) => (f.gioTouched ? f : { ...f, gioCal: "al", gioText: `${d.day}/${d.month}` }));
+      return;
+    }
+    if (!d.year) return;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    get<{ data?: { lunar?: { day: number; month: number; isLeap?: boolean } } }>(
+      `/genealogy/lunar/convert?date=${d.year}-${pad(d.month!)}-${pad(d.day)}`,
+    )
+      .then((b) => {
+        const l = b?.data?.lunar;
+        if (l)
+          setForm((f) =>
+            f.gioTouched ? f : { ...f, gioCal: "al", gioText: `${l.day}/${l.month}`, lunarLeap: !!l.isLeap },
+          );
+      })
+      .catch(() => undefined);
   }
 
   function personBody() {
@@ -423,7 +464,7 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
               setForm((f) =>
                 e.target.checked
                   ? { ...f, deceased: true, deathDirty: true }
-                  : { ...f, deceased: false, deathText: "", lunarLeap: false, deathDirty: true },
+                  : { ...f, deceased: false, deathText: "", gioText: "", gioTouched: false, lunarLeap: false, deathDirty: true },
               )
             }
           />
@@ -437,9 +478,11 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
                 <select
                   aria-label="Lịch"
                   value={form.deathCal}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, deathCal: e.target.value as "al" | "dl", deathDirty: true }))
-                  }
+                  onChange={(e) => {
+                    const c = e.target.value as "al" | "dl";
+                    setForm((f) => ({ ...f, deathCal: c, deathDirty: true }));
+                    autoGio(c, form.deathText);
+                  }}
                 >
                   <option value="al">ÂL</option>
                   <option value="dl">DL</option>
@@ -449,12 +492,38 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
                   onChange={(e) => {
                     const v = e.target.value;
                     setForm((f) => ({ ...f, deathText: v, deathDirty: true }));
+                    autoGio(form.deathCal, v);
                   }}
                   placeholder="ngày/tháng/năm hoặc năm"
                   inputMode="numeric"
                   maxLength={10}
                 />
-                {form.deathCal === "al" && form.deathText.includes("/") && (
+              </div>
+            </div>
+            <div className="muted-text" style={{ marginTop: 12 }}>
+              Ngày giỗ
+              <div className="ngay-mat">
+                <select
+                  aria-label="Lịch ngày giỗ"
+                  value={form.gioCal}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, gioCal: e.target.value as "al" | "dl", gioTouched: true, deathDirty: true }))
+                  }
+                >
+                  <option value="al">ÂL</option>
+                  <option value="dl">DL</option>
+                </select>
+                <input
+                  value={form.gioText}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((f) => ({ ...f, gioText: v, gioTouched: !!v.trim(), deathDirty: true }));
+                  }}
+                  placeholder="ngày/tháng"
+                  inputMode="numeric"
+                  maxLength={5}
+                />
+                {form.gioCal === "al" && (
                   <span className="chk">
                     <input
                       type="checkbox"

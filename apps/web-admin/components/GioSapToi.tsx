@@ -9,6 +9,7 @@ interface Anniversary {
   personId: string;
   fullName: string;
   deathLunar: string;
+  gioLabel?: string;
   nextSolar: string;
   daysUntil: number;
 }
@@ -57,7 +58,7 @@ export default function GioSapToi({
               <span className="grow">
                 <strong>{a.fullName}</strong>
                 <span className="sub" style={{ display: "block" }}>
-                  Giỗ ngày {a.deathLunar} âm lịch · {fmtSolar(a.nextSolar)}
+                  Giỗ ngày {a.gioLabel ?? `${a.deathLunar} âm lịch`} · {fmtSolar(a.nextSolar)}
                 </span>
               </span>
               <span className={`badge ${a.daysUntil <= 7 ? "warm" : ""}`}>

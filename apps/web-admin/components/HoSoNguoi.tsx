@@ -39,6 +39,9 @@ interface Person {
   deathLunarMonth?: number | null;
   deathLunarLeap?: boolean;
   isDeceased?: boolean;
+  deathLunarText?: string | null;
+  annivSolarDay?: number | null;
+  annivSolarMonth?: number | null;
   updatedAt?: string;
   accountLink?: { status: string; mine: boolean; displayName: string } | null;
 }
@@ -89,12 +92,18 @@ export default function HoSoNguoi({
         ["Chi", p.branch],
         ["Vai trò trong họ", p.roleInLineage],
         ["Sinh", fmtDate(p.dateOfBirth, p.birthYearOnly)],
-        ["Mất", fmtDate(p.dateOfDeath, p.deathYearOnly) || (p.isDeceased ? "Không rõ năm" : null)],
         [
-          "Giỗ (âm lịch)",
+          "Mất",
+          (p.deathLunarText ? `${p.deathLunarText} âm lịch` : fmtDate(p.dateOfDeath, p.deathYearOnly)) ||
+            (daMat(p) ? "Không rõ ngày" : null),
+        ],
+        [
+          "Giỗ",
           p.deathLunarDay && p.deathLunarMonth
-            ? `${p.deathLunarDay}/${p.deathLunarMonth}${p.deathLunarLeap ? " nhuận" : ""}`
-            : null,
+            ? `${p.deathLunarDay}/${p.deathLunarMonth}${p.deathLunarLeap ? " nhuận" : ""} âm lịch`
+            : p.annivSolarDay && p.annivSolarMonth
+              ? `${p.annivSolarDay}/${p.annivSolarMonth} dương lịch`
+              : null,
         ],
         ["Phần mộ", p.burialPlace || (daMat(p) ? "Chưa ghi, bấm “Sửa / đề xuất sửa” để bổ sung" : null)],
         ["Quê quán", p.hometown],
@@ -377,6 +386,10 @@ const FIELD_LABEL: Record<string, string> = {
   deathLunarDay: "Ngày giỗ (âm)",
   deathLunarMonth: "Tháng giỗ (âm)",
   deathLunarLeap: "Tháng nhuận",
+  deathLunarText: "Ngày mất (âm)",
+  annivSolarDay: "Ngày giỗ (dương)",
+  annivSolarMonth: "Tháng giỗ (dương)",
+  isDeceased: "Đã mất",
   bloodType: "Nhóm máu",
 };
 
