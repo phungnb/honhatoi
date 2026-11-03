@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Noto+Serif:wght@400;600;700&display=swap");
 
 /* ===== Modern Family Tech — design tokens (dark-first) ===== */
 :root {
@@ -25,6 +25,8 @@
   --info-line: rgba(124, 156, 255, 0.35);
   --radius: 16px;
   --font: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  /* Chữ có chân cho cây gia phả: dấu tiếng Việt chồng (Ễ, Ỗ, Ậ) rõ, không dính. */
+  --font-serif: "Noto Serif", "Times New Roman", Georgia, serif;
 }
 
 /* Cỡ chữ người dùng chọn ở trang Cá nhân; mọi cỡ chữ tính theo rem. */
@@ -971,18 +973,113 @@ blockquote.trich-dan {
 }
 
 /* ===== Sơ đồ cây phả hệ (thu phóng, kéo) ===== */
+/* ===== Sơ đồ cây kiểu cuốn thư: giấy dó, trục gỗ, mực nâu, viền đỏ son – vàng kim ===== */
 .sd-wrap {
   position: relative;
 }
+.cuon-thu {
+  --giay: #f3e5c4;
+  --giay-2: #ead6a8;
+  --muc: #3a2314;
+  --muc-nhat: #6e5238;
+  --son: #9b1c1c;
+  --kim: #b5882f;
+  --kim-nhat: rgba(181, 136, 47, 0.45);
+  padding: 0 4px;
+  color: var(--muc);
+}
+/* Trục gỗ trên và dưới, hai đầu núm đồng. */
+.ct-truc {
+  position: relative;
+  height: 16px;
+  margin: 0 6px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #4a2410 0%, #9a5a2e 35%, #c98a52 50%, #7a3f1c 70%, #3d1d0c 100%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+}
+.ct-truc::before,
+.ct-truc::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  width: 14px;
+  height: 22px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #7a5a1c, #e3bd62 45%, #a37a28 70%, #5b410f);
+}
+.ct-truc::before {
+  left: -10px;
+}
+.ct-truc::after {
+  right: -10px;
+}
+.ct-giay {
+  position: relative;
+  margin: -4px 14px;
+  padding: 14px 12px 12px;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(255, 255, 255, 0.35), transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(150, 100, 40, 0.12), transparent 60%),
+    repeating-linear-gradient(92deg, rgba(120, 80, 30, 0.035) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, var(--giay), var(--giay-2));
+  /* Khung đôi: chỉ vàng kim ngoài, chỉ đỏ son trong. */
+  box-shadow:
+    inset 0 0 0 5px var(--giay),
+    inset 0 0 0 6px var(--kim),
+    inset 0 0 0 9px var(--giay),
+    inset 0 0 0 10.5px var(--son);
+}
+.ct-dau {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 12px 4px;
+  font-family: var(--font-serif);
+  text-align: center;
+}
+.ct-nhan {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--son);
+  padding-left: 0.35em; /* bù letter-spacing để chữ giữa thật */
+}
+.ct-ten {
+  font-family: var(--font-serif);
+  font-size: clamp(1.0625rem, 4.6vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--son);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* Hoa văn dưới tiêu đề: hai đường chỉ vàng, hình thoi ở giữa. */
+.ct-hoa-van {
+  position: relative;
+  width: min(220px, 70%);
+  height: 10px;
+  margin-top: 2px;
+  background: linear-gradient(var(--kim), var(--kim)) left center / calc(50% - 10px) 1px no-repeat,
+    linear-gradient(var(--kim), var(--kim)) right center / calc(50% - 10px) 1px no-repeat;
+}
+.ct-hoa-van::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  background: var(--son);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
 .sd-view {
   position: relative;
-  height: min(72vh, 720px);
+  height: min(66vh, 680px);
+  margin: 0 4px;
   overflow: hidden;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background:
-    radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0 / 22px 22px,
-    var(--bg);
   touch-action: none;
   cursor: grab;
   user-select: none;
@@ -1006,93 +1103,151 @@ blockquote.trich-dan {
 }
 .sd-lines path {
   fill: none;
-  stroke: var(--muted-2);
+  stroke: var(--muc-nhat);
   stroke-width: 1.5;
 }
+/* Thân cuốn thư: cột "Đời" bên trái, khung cây bên phải. */
+.ct-than {
+  display: flex;
+  margin: 0 4px;
+}
+.ct-than .sd-view {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.ct-doi {
+  position: relative;
+  flex: 0 0 46px;
+  overflow: hidden;
+  border-right: 1px solid var(--kim-nhat);
+  pointer-events: none;
+}
+.ct-doi span {
+  position: absolute;
+  left: 3px;
+  right: 5px;
+  transform: translateY(-50%);
+  padding: 3px 0;
+  border-radius: 4px;
+  background: var(--son);
+  color: #fbeccb;
+  font-family: var(--font-serif);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(58, 35, 20, 0.35);
+}
+/* Thẻ người: như thẻ bài trên giấy, nam viền son, nữ viền kim. */
 .sd-box {
   position: absolute;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  border-top: 3px solid var(--brand);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--kim-nhat);
+  border-top: 3px solid var(--son);
+  background: #fbf3e0;
+  color: var(--muc);
+  font-family: var(--font-serif);
   text-align: center;
   cursor: pointer;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(58, 35, 20, 0.18);
 }
 .sd-box strong {
-  font-size: 0.875rem;
-  line-height: 1.25;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  /* Dòng cao 1.35 để dấu chồng (Nguyễn, Tổ) không bị cắt khi tên xuống hai dòng. */
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .sd-box .sub {
-  font-size: 0.8125rem;
-  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muc-nhat);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 .sd-box.female {
-  border-top-color: var(--warm);
+  border-top-color: var(--kim);
 }
 .sd-box.spouse {
   border-style: dashed;
   border-top-style: solid;
 }
 .sd-box.dead strong {
-  opacity: 0.75;
+  opacity: 0.8;
 }
 .sd-box.root {
-  box-shadow: 0 0 0 2px var(--brand-line);
+  box-shadow:
+    0 0 0 2px var(--son),
+    0 2px 6px rgba(58, 35, 20, 0.3);
 }
 .sd-box:hover,
 .sd-box:focus-visible {
-  border-color: var(--brand-line);
+  border-color: var(--son);
   outline: none;
 }
 .sd-fold {
   position: absolute;
-  min-width: 30px;
-  height: 24px;
+  min-width: 28px;
+  height: 22px;
   padding: 0 6px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
+  border-radius: 11px;
+  border: 1px solid var(--kim);
+  background: #fbf3e0;
+  color: var(--son);
+  font-family: var(--font);
   font-size: 0.8125rem;
   font-weight: 700;
+  line-height: 1;
   cursor: pointer;
   z-index: 1;
 }
 .sd-tools {
   position: absolute;
-  right: 10px;
-  bottom: 44px;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  pointer-events: none;
+  z-index: 3;
 }
 .sd-tools .btn {
   min-width: 44px;
   min-height: 44px;
   font-size: 1.125rem;
   font-weight: 700;
-  background: var(--surface);
+  background: #fbf3e0;
+  color: var(--son);
+  border-color: var(--kim);
+  box-shadow: 0 1px 3px rgba(58, 35, 20, 0.25);
+  pointer-events: auto;
+}
+@media (max-width: 480px) {
+  .sd-tools .btn {
+    padding: 6px 12px;
+  }
 }
 .sd-tools .btn:last-child {
   font-size: 0.875rem;
 }
 .sd-hint {
-  margin-top: 8px;
+  margin-top: 10px;
   min-height: 26px;
   font-size: 0.8125rem;
 }
@@ -1646,13 +1801,13 @@ blockquote.trich-dan {
 /* Nhánh ngoại (con cháu của con gái trong họ) và người nhiều đời vợ/chồng */
 .sd-box.ngoai {
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--warm) 45%, var(--border));
+  border-color: #8a6a45;
   border-top-style: solid;
-  background: color-mix(in srgb, var(--warm) 6%, var(--surface));
+  background: #f1e4c6;
 }
 .sd-fold.ngoai {
-  border-color: color-mix(in srgb, var(--warm) 55%, var(--border));
-  color: var(--warm);
+  border-color: #8a6a45;
+  color: #6e5238;
   white-space: nowrap;
 }
 .sd-tools .btn:not(:nth-child(-n + 2)) {
