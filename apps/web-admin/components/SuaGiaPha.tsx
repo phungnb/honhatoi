@@ -7,8 +7,8 @@
  * vẫn kiểm tra quyền; người không đủ quyền sẽ thành đề xuất chờ duyệt.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import { del, get, patch, post, put } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 
@@ -357,20 +357,95 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
       a.fullName.localeCompare(b.fullName),
   );
 
-  /** Đổi chỗ với người kề trên/dưới trong cùng đời rồi lưu thứ tự cả danh sách. */
-  async function move(i: number, dir: -1 | 1) {
-    const j = i + dir;
-    if (j < 0 || j >= sorted.length || sorted[j].generation !== sorted[i].generation) return;
-    const next = [...sorted];
-    [next[i], next[j]] = [next[j], next[i]];
-    const ids = next.map((p) => p.id);
+  /** Lưu thứ tự mới (cả danh sách); lỗi thì trả lại thứ tự cũ. */
+  async function saveOrder(ids: string[]) {
     const prev = persons;
     setPersons(persons.map((p) => ({ ...p, sortOrder: ids.indexOf(p.id) })));
     try {
       await put(`/genealogy/lineages/${lineageId}/persons/order`, { ids });
+      await load();
     } catch (e) {
       setPersons(prev);
       setError(apiMessage(e));
+    }
+  }
+
+  /** Bàn phím trên tay nắm: ↑/↓ đổi chỗ với người kề bên trong cùng đời. */
+  function moveByKey(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= sorted.length || sorted[j].generation !== sorted[i].generation) return;
+    const next = sorted.map((p) => p.id);
+    [next[i], next[j]] = [next[j], next[i]];
+    void saveOrder(next);
+  }
+
+  // Kéo thả bằng Pointer Events: chạy cả chuột lẫn cảm ứng, không cần thư viện.
+  // Chỉ kéo trong cùng đời (danh sách sắp theo đời trước, thứ tự sau).
+  const [drag, setDrag] = useState<{ id: string; order: string[] } | null>(null);
+  const dragStartOrder = useRef<string[]>([]);
+  const byId = useMemo(() => new Map(persons.map((p) => [p.id, p])), [persons]);
+  const shown = drag ? drag.order.map((id) => byId.get(id)!).filter(Boolean) : sorted;
+
+  // Nghe trên window thay vì pointer capture: dòng đang kéo bị React dời chỗ
+  // trong DOM, một số trình duyệt sẽ nhả capture khi phần tử bị dời.
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
+  const dragging = drag !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    function onMove(e: globalThis.PointerEvent) {
+      const d = dragRef.current;
+      if (!d) return;
+      e.preventDefault();
+      // Tự cuộn khi kéo sát mép màn hình (danh sách dài trên điện thoại).
+      const edge = 60;
+      if (e.clientY < edge) window.scrollBy(0, -12);
+      else if (e.clientY > window.innerHeight - edge) window.scrollBy(0, 12);
+      const row = document
+        .elementFromPoint(e.clientX, e.clientY)
+        ?.closest<HTMLElement>("tr[data-pid]");
+      const overId = row?.dataset.pid;
+      if (!overId || overId === d.id) return;
+      const me = byId.get(d.id);
+      const over = byId.get(overId);
+      if (!me || !over || me.generation !== over.generation) return;
+      const from = d.order.indexOf(d.id);
+      const target = d.order.indexOf(overId);
+      const order = d.order.filter((x) => x !== d.id);
+      const to = order.indexOf(overId);
+      // Kéo xuống thì chèn sau dòng đang chỉ, kéo lên thì chèn trước.
+      order.splice(target > from ? to + 1 : to, 0, d.id);
+      setDrag({ id: d.id, order });
+    }
+    function onUp() {
+      const d = dragRef.current;
+      setDrag(null);
+      if (d && d.order.join() !== dragStartOrder.current.join()) void saveOrder(d.order);
+    }
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    // saveOrder/byId đọc state mới nhất qua closure của lần render bắt đầu kéo là đủ.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging]);
+
+  function onHandleDown(e: PointerEvent<HTMLButtonElement>, id: string) {
+    if (busy || drag || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault();
+    const order = sorted.map((p) => p.id);
+    dragStartOrder.current = order;
+    setDrag({ id, order });
+  }
+
+  function onHandleKey(e: KeyboardEvent<HTMLButtonElement>, i: number) {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      moveByKey(i, e.key === "ArrowUp" ? -1 : 1);
     }
   }
 
@@ -604,8 +679,25 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
           <div className="table-wrap">
             <table>
               <tbody>
-                {sorted.map((p, i) => (
-                  <tr key={p.id}>
+                {shown.map((p, i) => (
+                  <tr
+                    key={p.id}
+                    data-pid={p.id}
+                    className={drag?.id === p.id ? "row-dragging" : undefined}
+                  >
+                    <td className="drag-cell">
+                      <button
+                        type="button"
+                        className="drag-handle"
+                        aria-label={`Kéo để đổi thứ tự ${p.fullName} (hoặc dùng phím mũi tên lên/xuống)`}
+                        title="Kéo để đổi thứ tự trong cùng đời"
+                        disabled={busy}
+                        onPointerDown={(e) => onHandleDown(e, p.id)}
+                        onKeyDown={(e) => onHandleKey(e, i)}
+                      >
+                        ⠿
+                      </button>
+                    </td>
                     <td>
                       <strong>{p.fullName}</strong>
                       <span className="muted-text">
@@ -620,22 +712,6 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
                       {p.branch ? ` · ${p.branch}` : ""}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      <button
-                        className="btn btn-icon"
-                        aria-label={`Đưa ${p.fullName} lên`}
-                        disabled={busy || i === 0 || sorted[i - 1].generation !== p.generation}
-                        onClick={() => void move(i, -1)}
-                      >
-                        ↑
-                      </button>{" "}
-                      <button
-                        className="btn btn-icon"
-                        aria-label={`Đưa ${p.fullName} xuống`}
-                        disabled={busy || i === sorted.length - 1 || sorted[i + 1].generation !== p.generation}
-                        onClick={() => void move(i, 1)}
-                      >
-                        ↓
-                      </button>{" "}
                       <button className="btn" disabled={busy} onClick={() => startEdit(p)}>
                         Sửa
                       </button>{" "}

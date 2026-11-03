@@ -378,7 +378,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
         </p>
       ) : view === "sodo" && !q ? (
         <div className="section-gap">
-          <SoDoCay persons={persons} relationships={relationships} rootId={rootId} onOpen={setOpenId} />
+          <SoDoCay persons={persons} relationships={relationships} rootId={rootId} onOpen={setOpenId} tieuDe={lineage?.name} />
         </div>
       ) : view === "cay" && !q ? (
         <div className="card section-gap">

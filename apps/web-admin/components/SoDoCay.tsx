@@ -66,11 +66,14 @@ export default function SoDoCay({
   relationships,
   rootId,
   onOpen,
+  tieuDe,
 }: {
   persons: CayPerson[];
   relationships: CayRelationship[];
   rootId?: string | null;
   onOpen: (id: string) => void;
+  /** Tên dòng họ in trên đầu cuốn thư, ví dụ "Họ Nguyễn tại Đồng Nai". */
+  tieuDe?: string | null;
 }) {
   const { byId, children, parents, spouses, roots } = useMemo(
     () => dungCay(persons, relationships, rootId),
@@ -149,6 +152,7 @@ export default function SoDoCay({
     tops.forEach(walk);
     return {
       nodes: all,
+      maxDepth,
       width: Math.max(0, left - GAP_X * 2) + PAD * 2,
       height: (maxDepth + 1) * (H + GAP_Y) - GAP_Y + PAD * 2 + 28,
     };
@@ -301,6 +305,13 @@ export default function SoDoCay({
     });
   }
 
+  // Đời của hàng trên cùng: lấy theo đời đã ghi của người gốc, không có thì là đời 1.
+  const doiDau = (() => {
+    const top = layout.nodes.find((n) => n.depth === 0);
+    const g = top ? byId.get(top.id)?.generation : null;
+    return g && g > 0 ? g : 1;
+  })();
+
   // ---- Đường nối ----
   const lines: string[] = [];
   for (const n of layout.nodes) {
@@ -368,67 +379,88 @@ export default function SoDoCay({
 
   return (
     <div className="sd-wrap">
-      <div
-        ref={viewRef}
-        className="sd-view"
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={onUp}
-      >
-        <div
-          className="sd-canvas"
-          style={{
-            width: layout.width,
-            height: layout.height,
-            transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})`,
-          }}
-        >
-          <svg width={layout.width} height={layout.height} className="sd-lines" aria-hidden>
-            <path d={lines.join("")} />
-          </svg>
-          {layout.nodes.map((n) => {
-            const { main, sp } = slots(n);
-            const female = byId.get(n.id)?.gender === "female";
-            const fx = n.x + main * SLOT + W / 2;
-            return (
-              <div key={n.id}>
-                {box(n.id, n.x + main * SLOT, n.y, null, n.ngoai)}
-                {n.spouses.map((s, i) => box(s, n.x + sp[i] * SLOT, n.y, spouseLabel(n, i), n.ngoai))}
-                {(n.kids.length > 0 || n.hidden > 0) && (
-                  <button
-                    className={`sd-fold${n.hidden && female && n.depth > 0 ? " ngoai" : ""}`}
-                    style={{ left: PAD + fx, top: PAD + n.y + H + 6, transform: "translateX(-50%)" }}
-                    aria-label={n.hidden ? `Mở nhánh, ${n.hidden} con` : "Gập nhánh"}
-                    onClick={() => toggle(n.id)}
-                  >
-                    {n.hidden ? (female && n.depth > 0 ? `+${n.hidden} nhánh ngoại` : `+${n.hidden}`) : "−"}
-                  </button>
-                )}
+      <div className="cuon-thu">
+        <div className="ct-truc" aria-hidden />
+        <div className="ct-giay">
+          <header className="ct-dau">
+            <span className="ct-nhan">Phả đồ</span>
+            {tieuDe && <h2 className="ct-ten">{tieuDe}</h2>}
+            <span className="ct-hoa-van" aria-hidden />
+          </header>
+          <div className="ct-than">
+            {/* Cột "Đời" bên trái, chạy theo khi kéo/phóng dọc, không che khung người. */}
+            <div className="ct-doi" aria-hidden>
+              {Array.from({ length: layout.maxDepth + 1 }, (_, d) => (
+                <span key={d} style={{ top: t.y + (PAD + d * (H + GAP_Y) + H / 2) * t.s }}>
+                  Đời {doiDau + d}
+                </span>
+              ))}
+            </div>
+            <div
+              ref={viewRef}
+              className="sd-view"
+              onPointerDown={onDown}
+              onPointerMove={onMove}
+              onPointerUp={onUp}
+              onPointerCancel={onUp}
+            >
+              <div
+                className="sd-canvas"
+                style={{
+                  width: layout.width,
+                  height: layout.height,
+                  transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})`,
+                }}
+              >
+                <svg width={layout.width} height={layout.height} className="sd-lines" aria-hidden>
+                  <path d={lines.join("")} />
+                </svg>
+                {layout.nodes.map((n) => {
+                  const { main, sp } = slots(n);
+                  const female = byId.get(n.id)?.gender === "female";
+                  const fx = n.x + main * SLOT + W / 2;
+                  return (
+                    <div key={n.id}>
+                      {box(n.id, n.x + main * SLOT, n.y, null, n.ngoai)}
+                      {n.spouses.map((s, i) => box(s, n.x + sp[i] * SLOT, n.y, spouseLabel(n, i), n.ngoai))}
+                      {(n.kids.length > 0 || n.hidden > 0) && (
+                        <button
+                          className={`sd-fold${n.hidden && female && n.depth > 0 ? " ngoai" : ""}`}
+                          style={{ left: PAD + fx, top: PAD + n.y + H + 6, transform: "translateX(-50%)" }}
+                          aria-label={n.hidden ? `Mở nhánh, ${n.hidden} con` : "Gập nhánh"}
+                          onClick={() => toggle(n.id)}
+                        >
+                          {n.hidden ? (female && n.depth > 0 ? `+${n.hidden} nhánh ngoại` : `+${n.hidden}`) : "−"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          </div>
+          <div className="sd-tools">
+            <button className="btn" onClick={() => zoomCenter(1.25)} aria-label="Phóng to">
+              +
+            </button>
+            <button className="btn" onClick={() => zoomCenter(0.8)} aria-label="Thu nhỏ">
+              −
+            </button>
+            {ngoaiRoots.size > 0 && (
+              <button className="btn" onClick={toggleNgoai}>
+                {ngoaiOpen ? "Gập nhánh ngoại" : "Mở nhánh ngoại"}
+              </button>
+            )}
+            <button className="btn" onClick={fit}>
+              Xem toàn bộ
+            </button>
+          </div>
         </div>
-      </div>
-      <div className="sd-tools">
-        <button className="btn" onClick={() => zoomCenter(1.25)} aria-label="Phóng to">
-          +
-        </button>
-        <button className="btn" onClick={() => zoomCenter(0.8)} aria-label="Thu nhỏ">
-          −
-        </button>
-        {ngoaiRoots.size > 0 && (
-          <button className="btn" onClick={toggleNgoai}>
-            {ngoaiOpen ? "Gập nhánh ngoại" : "Mở nhánh ngoại"}
-          </button>
-        )}
-        <button className="btn" onClick={fit}>
-          Xem toàn bộ
-        </button>
+        <div className="ct-truc" aria-hidden />
       </div>
       <p className="muted-text sd-hint">
         Kéo để di chuyển, chụm hai ngón để phóng to/thu nhỏ. Bấm vào tên để xem hồ sơ. Khung viền
-        đứt nét màu cam là con cháu nhánh ngoại (con của con gái trong họ).
+        đứt nét màu nâu là con cháu nhánh ngoại (con của con gái trong họ).
       </p>
     </div>
   );
