@@ -162,7 +162,7 @@ export interface NextAnniversary {
   daysUntil: number;
 }
 
-function daysBetween(from: string, to: string): number {
+export function daysBetween(from: string, to: string): number {
   const a = Date.parse(`${from}T00:00:00Z`);
   const b = Date.parse(`${to}T00:00:00Z`);
   return Math.round((b - a) / 86400000);
@@ -185,6 +185,19 @@ export function nextAnniversary(
     return { solar: s, lunar: { ...death, year: y }, daysUntil: days };
   }
   return null;
+}
+
+/** Lần giỗ dương lịch tới (ngày/tháng cố định), gồm cả hôm nay. 29/2 năm thường lùi về 28/2. */
+export function nextSolarAnniversary(day: number, month: number, fromSolar: string): { solar: string; daysUntil: number } {
+  const y0 = Number(fromSolar.slice(0, 4));
+  for (const y of [y0, y0 + 1]) {
+    const last = new Date(Date.UTC(y, month, 0)).getUTCDate();
+    const d = Math.min(day, last);
+    const s = `${y}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const days = daysBetween(fromSolar, s);
+    if (days >= 0) return { solar: s, daysUntil: days };
+  }
+  throw new Error('unreachable');
 }
 
 /** Chuỗi hiển thị ngày âm: "15/8", tháng nhuận thêm " nhuận". */

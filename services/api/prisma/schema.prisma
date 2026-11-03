@@ -339,6 +339,11 @@ model FamilyPerson {
   deathLunarDay     Int?               @map("death_lunar_day") @db.SmallInt
   deathLunarMonth   Int?               @map("death_lunar_month") @db.SmallInt
   deathLunarLeap    Boolean            @default(false) @map("death_lunar_leap")
+  /// Ngày mất ghi theo âm lịch đúng như người nhập ("13/5/2023" hoặc "13/5").
+  deathLunarText    String?            @map("death_lunar_text") @db.VarChar(20)
+  /// Giỗ theo dương lịch (gia đình làm giỗ ngày dương): ngày/tháng, không năm.
+  annivSolarDay     Int?               @map("anniv_solar_day") @db.SmallInt
+  annivSolarMonth   Int?               @map("anniv_solar_month") @db.SmallInt
   generation        Int?
   branch            String?            @db.VarChar(255)
   roleInLineage     String?            @map("role_in_lineage") @db.VarChar(255)

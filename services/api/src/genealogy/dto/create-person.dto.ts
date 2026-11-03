@@ -60,6 +60,25 @@ export class CreatePersonDto {
   @IsBoolean()
   deathLunarLeap?: boolean;
 
+  /** Ngày mất âm lịch như người nhập, VD "13/5/2023". */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  deathLunarText?: string | null;
+
+  /** Giỗ theo dương lịch: ngày/tháng. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  annivSolarDay?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  annivSolarMonth?: number | null;
+
   @IsOptional()
   @IsInt()
   generation?: number;

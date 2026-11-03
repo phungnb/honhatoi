@@ -29,6 +29,7 @@ interface Anniversary {
   personId: string;
   fullName: string;
   deathLunar: string;
+  gioLabel?: string;
   nextSolar: string;
   daysUntil: number;
 }
@@ -117,7 +118,7 @@ function buildUpcoming(anns: Anniversary[], persons: TreePerson[], events: Event
       key: `gio-${a.personId}`,
       date: new Date(y, m - 1, d),
       title: `Giỗ ${a.fullName}`,
-      sub: `${whenLabel(a.daysUntil)} · ${a.deathLunar} âm lịch`,
+      sub: `${whenLabel(a.daysUntil)} · ${a.gioLabel ?? `${a.deathLunar} âm lịch`}`,
       tag: "Giỗ",
       cls: "warm",
       href: "/app/gia-pha",

@@ -12,6 +12,7 @@ import { can } from '../common/permissions';
 import {
   formatLunar,
   nextAnniversary,
+  nextSolarAnniversary,
   solarStrToLunar,
   solarToLunar,
   todayVn,
@@ -234,6 +235,9 @@ export class GenealogyService {
       'deathLunarDay',
       'deathLunarMonth',
       'deathLunarLeap',
+      'deathLunarText',
+      'annivSolarDay',
+      'annivSolarMonth',
       'generation',
       'branch',
       'roleInLineage',
@@ -1796,6 +1800,7 @@ export class GenealogyService {
         OR: [
           { dateOfDeath: { not: null } },
           { deathLunarDay: { not: null }, deathLunarMonth: { not: null } },
+          { annivSolarDay: { not: null }, annivSolarMonth: { not: null } },
         ],
       },
       select: {
@@ -1806,6 +1811,8 @@ export class GenealogyService {
         deathLunarDay: true,
         deathLunarMonth: true,
         deathLunarLeap: true,
+        annivSolarDay: true,
+        annivSolarMonth: true,
         burialPlace: true,
       },
       orderBy: { fullName: 'asc' },
@@ -1815,6 +1822,22 @@ export class GenealogyService {
     for (const p of deceased) {
       // Chỉ biết năm mất thì ngày 1/1 không phải ngày mất thật: chỉ tính giỗ khi có ngày âm nhập tay.
       const deathSolar = p.dateOfDeath && !p.deathYearOnly ? toVnDateString(p.dateOfDeath) : null;
+      // Gia đình làm giỗ theo dương lịch: ngày/tháng cố định mỗi năm.
+      if (p.annivSolarDay && p.annivSolarMonth && !p.deathLunarDay) {
+        const n = nextSolarAnniversary(p.annivSolarDay, p.annivSolarMonth, today);
+        if (withinDays !== undefined && n.daysUntil > withinDays) continue;
+        rows.push({
+          personId: p.id,
+          fullName: p.fullName,
+          burialPlace: p.burialPlace,
+          deathSolar,
+          deathLunar: formatLunar(solarStrToLunar(n.solar)),
+          gioLabel: `${p.annivSolarDay}/${p.annivSolarMonth} dương lịch`,
+          nextSolar: n.solar,
+          daysUntil: n.daysUntil,
+        });
+        continue;
+      }
       // Ngày mất âm nhập tay được ưu tiên: đó là ngày gia đình làm giỗ.
       const deathLunar =
         p.deathLunarDay && p.deathLunarMonth
@@ -1837,6 +1860,7 @@ export class GenealogyService {
         burialPlace: p.burialPlace,
         deathSolar,
         deathLunar: formatLunar(deathLunar),
+        gioLabel: `${formatLunar(deathLunar)} âm lịch`,
         nextSolar: next.solar,
         daysUntil: next.daysUntil,
       });
@@ -1878,7 +1902,7 @@ export class GenealogyService {
             r.daysUntil === 0
               ? `Hôm nay là giỗ ${r.fullName}`
               : `Còn ${r.daysUntil} ngày đến giỗ ${r.fullName}`,
-          body: `Ngày ${r.deathLunar} âm lịch, tức ${r.nextSolar.split('-').reverse().join('/')}${r.burialPlace ? ` · Phần mộ: ${r.burialPlace}` : ''}`,
+          body: `Ngày ${r.gioLabel}, tức ${r.nextSolar.split('-').reverse().join('/')}${r.burialPlace ? ` · Phần mộ: ${r.burialPlace}` : ''}`,
           data: { lineageId: l.id, personId: r.personId, nextSolar: r.nextSolar },
           dedupKey: `gio:${r.personId}:${r.nextSolar}:${r.daysUntil}:user:${m.userId}`,
         })),
