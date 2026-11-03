@@ -19,6 +19,7 @@ interface Person {
   gender?: string | null;
   dateOfBirth?: string | null;
   dateOfDeath?: string | null;
+  deathYearOnly?: boolean;
   burialPlace?: string | null;
   deathLunarDay?: number | null;
   deathLunarMonth?: number | null;
@@ -63,6 +64,7 @@ const EMPTY = {
   fullName: "",
   gender: "male",
   birthYear: "",
+  deathYear: "",
   dateOfDeath: "",
   lunarDeath: "",
   lunarLeap: false,
@@ -136,7 +138,13 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
       fullName: form.fullName.trim(),
       gender: form.gender,
       ...(y ? { dateOfBirth: `${y}-01-01`, birthYearOnly: true } : {}),
-      ...(form.dateOfDeath ? { dateOfDeath: form.dateOfDeath } : {}),
+      ...(form.dateOfDeath
+        ? { dateOfDeath: form.dateOfDeath, deathYearOnly: false }
+        : /^\d{4}$/.test(form.deathYear.trim())
+          ? { dateOfDeath: `${form.deathYear.trim()}-01-01`, deathYearOnly: true }
+          : editing?.dateOfDeath
+            ? { dateOfDeath: null, deathYearOnly: false }
+            : {}),
       ...(lunar
         ? { deathLunarDay: lunar.day, deathLunarMonth: lunar.month, deathLunarLeap: form.lunarLeap }
         : editing?.deathLunarDay
@@ -223,6 +231,21 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     }
   }
 
+  /** Biết ngày mất dương lịch thì tự điền ngày giỗ âm (vẫn sửa tay được). */
+  function fillLunar(date: string) {
+    get<{ data?: { lunar?: { day: number; month: number; isLeap?: boolean } } }>(
+      `/genealogy/lunar/convert?date=${date}`,
+    )
+      .then((b) => {
+        const l = b?.data?.lunar;
+        if (l)
+          setForm((f) =>
+            f.lunarDeath.trim() ? f : { ...f, lunarDeath: `${l.day}/${l.month}`, lunarLeap: !!l.isLeap },
+          );
+      })
+      .catch(() => undefined);
+  }
+
   function startEdit(p: Person) {
     setEditing(p);
     setMsg(null);
@@ -232,12 +255,15 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
       fullName: p.fullName,
       gender: p.gender ?? "male",
       birthYear: year(p.dateOfBirth),
-      dateOfDeath: p.dateOfDeath ? p.dateOfDeath.slice(0, 10) : "",
+      deathYear: year(p.dateOfDeath),
+      dateOfDeath: p.dateOfDeath && !p.deathYearOnly ? p.dateOfDeath.slice(0, 10) : "",
       lunarDeath: p.deathLunarDay && p.deathLunarMonth ? `${p.deathLunarDay}/${p.deathLunarMonth}` : "",
       lunarLeap: !!p.deathLunarLeap,
       burialPlace: p.burialPlace ?? "",
       branch: p.branch ?? "",
     });
+    if (p.dateOfDeath && !p.deathYearOnly && !(p.deathLunarDay && p.deathLunarMonth))
+      fillLunar(p.dateOfDeath.slice(0, 10));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -364,28 +390,31 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
               maxLength={4}
             />
           </label>
+          <label className="muted-text" style={{ flex: "1 1 120px" }}>
+            Năm mất (nếu đã mất)
+            <input
+              style={inputStyle}
+              value={form.deathYear}
+              onChange={(e) => {
+                const v = e.target.value;
+                // Sửa năm khác năm của ngày mất đã nhập thì bỏ ngày cũ, tránh lệch nhau.
+                setForm((f) => ({ ...f, deathYear: v, dateOfDeath: v && f.dateOfDeath.startsWith(v) ? f.dateOfDeath : "" }));
+              }}
+              placeholder="VD: 1985"
+              inputMode="numeric"
+              maxLength={4}
+            />
+          </label>
           <label className="muted-text" style={{ flex: "1 1 160px" }}>
-            Ngày mất (dương lịch, nếu đã mất)
+            Ngày mất dương lịch (nếu biết)
             <input
               style={inputStyle}
               type="date"
               value={form.dateOfDeath}
               onChange={(e) => {
                 const v = e.target.value;
-                set("dateOfDeath")(v);
-                // Biết ngày dương thì tự điền ngày giỗ âm (vẫn sửa tay được).
-                if (v && !form.lunarDeath.trim())
-                  get<{ data?: { lunar?: { day: number; month: number; isLeap?: boolean } } }>(
-                    `/genealogy/lunar/convert?date=${v}`,
-                  )
-                    .then((b) => {
-                      const l = b?.data?.lunar;
-                      if (l)
-                        setForm((f) =>
-                          f.lunarDeath.trim() ? f : { ...f, lunarDeath: `${l.day}/${l.month}`, lunarLeap: !!l.isLeap },
-                        );
-                    })
-                    .catch(() => undefined);
+                setForm((f) => ({ ...f, dateOfDeath: v, ...(v ? { deathYear: v.slice(0, 4) } : {}) }));
+                if (v && !form.lunarDeath.trim()) fillLunar(v);
               }}
             />
           </label>
@@ -411,7 +440,7 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
             Tháng nhuận
           </label>
         </div>
-        {(form.dateOfDeath || form.lunarDeath) && (
+        {(form.deathYear.trim() || form.dateOfDeath || form.lunarDeath.trim()) && (
           <label className="muted-text" style={{ display: "block", marginTop: 12 }}>
             Phần mộ ở đâu (ghi chú: nghĩa trang, khu, hàng, lối vào…)
             <textarea

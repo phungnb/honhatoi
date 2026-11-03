@@ -25,6 +25,11 @@ export class CreatePersonDto {
   @IsDateString()
   dateOfDeath?: string;
 
+  /** Chỉ biết năm mất: dateOfDeath gửi dạng YYYY-01-01. */
+  @IsOptional()
+  @IsBoolean()
+  deathYearOnly?: boolean;
+
   @IsOptional()
   @IsString()
   hometown?: string;

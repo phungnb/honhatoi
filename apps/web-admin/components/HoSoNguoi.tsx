@@ -20,6 +20,7 @@ interface Person {
   gender?: string | null;
   dateOfBirth?: string | null;
   birthYearOnly?: boolean;
+  deathYearOnly?: boolean;
   dateOfDeath?: string | null;
   burialPlace?: string | null;
   hometown?: string | null;
@@ -86,14 +87,14 @@ export default function HoSoNguoi({
         ["Chi", p.branch],
         ["Vai trò trong họ", p.roleInLineage],
         ["Sinh", fmtDate(p.dateOfBirth, p.birthYearOnly)],
-        ["Mất", fmtDate(p.dateOfDeath)],
+        ["Mất", fmtDate(p.dateOfDeath, p.deathYearOnly)],
         [
           "Giỗ (âm lịch)",
           p.deathLunarDay && p.deathLunarMonth
             ? `${p.deathLunarDay}/${p.deathLunarMonth}${p.deathLunarLeap ? " nhuận" : ""}`
             : null,
         ],
-        ["Phần mộ", p.burialPlace],
+        ["Phần mộ", p.burialPlace || (p.dateOfDeath || p.deathLunarDay ? "Chưa ghi, bấm “Sửa / đề xuất sửa” để bổ sung" : null)],
         ["Quê quán", p.hometown],
         ["Nơi ở", p.currentPlace],
         ["Nghề nghiệp", p.occupation],
@@ -119,15 +120,15 @@ export default function HoSoNguoi({
           <>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <div
-                className={`avatar${p.gender === "female" ? " female" : ""}${p.dateOfDeath ? " dead" : ""}`}
+                className={`avatar${p.gender === "female" ? " female" : ""}${p.dateOfDeath || p.deathLunarDay ? " dead" : ""}`}
                 style={{ width: 52, height: 52, fontSize: 20 }}
               >
                 {p.fullName.trim().split(/\s+/).pop()?.[0] ?? "?"}
               </div>
               <div className="grow">
                 <h2 style={{ fontSize: 20 }}>{p.fullName}</h2>
-                <span className={`badge ${p.dateOfDeath ? "warm" : "brand"}`}>
-                  {p.dateOfDeath ? "Đã mất" : "Đang sống"}
+                <span className={`badge ${p.dateOfDeath || p.deathLunarDay ? "warm" : "brand"}`}>
+                  {p.dateOfDeath || p.deathLunarDay ? "Đã mất" : "Đang sống"}
                 </span>
               </div>
             </div>

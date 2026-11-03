@@ -219,6 +219,7 @@ export class GenealogyService {
       'avatarUrl',
       'gender',
       'birthYearOnly',
+      'deathYearOnly',
       'hometown',
       'currentPlace',
       'phone',
@@ -241,6 +242,8 @@ export class GenealogyService {
     for (const k of allowed) if (after[k] !== undefined) data[k] = after[k];
     if (after['dateOfBirth']) data['dateOfBirth'] = new Date(after['dateOfBirth'] as string);
     if (after['dateOfDeath']) data['dateOfDeath'] = new Date(after['dateOfDeath'] as string);
+    // Gửi null để xóa ngày/năm mất (nhập nhầm người còn sống là đã mất).
+    else if (after['dateOfDeath'] === null) data['dateOfDeath'] = null;
     return data;
   }
 
@@ -1633,7 +1636,9 @@ export class GenealogyService {
         dob: p.birthYearOnly && p.dateOfBirth
           ? `Năm ${new Date(p.dateOfBirth as Date).getFullYear()}`
           : fmtDate(p.dateOfBirth as Date | null),
-        dod: fmtDate(p.dateOfDeath as Date | null),
+        dod: p.deathYearOnly && p.dateOfDeath
+          ? `Năm ${new Date(p.dateOfDeath as Date).getFullYear()}`
+          : fmtDate(p.dateOfDeath as Date | null),
         status: p.dateOfDeath ? 'Đã mất' : 'Đang sống',
         hometown: p.hometown ?? '',
         burialPlace: p.burialPlace ?? '',
@@ -1796,6 +1801,7 @@ export class GenealogyService {
         id: true,
         fullName: true,
         dateOfDeath: true,
+        deathYearOnly: true,
         deathLunarDay: true,
         deathLunarMonth: true,
         deathLunarLeap: true,
@@ -1806,7 +1812,8 @@ export class GenealogyService {
     });
     const rows = [];
     for (const p of deceased) {
-      const deathSolar = p.dateOfDeath ? toVnDateString(p.dateOfDeath) : null;
+      // Chỉ biết năm mất thì ngày 1/1 không phải ngày mất thật: chỉ tính giỗ khi có ngày âm nhập tay.
+      const deathSolar = p.dateOfDeath && !p.deathYearOnly ? toVnDateString(p.dateOfDeath) : null;
       // Ngày mất âm nhập tay được ưu tiên: đó là ngày gia đình làm giỗ.
       const deathLunar =
         p.deathLunarDay && p.deathLunarMonth

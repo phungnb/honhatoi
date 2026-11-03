@@ -318,6 +318,8 @@ model FamilyPerson {
   dateOfBirth       DateTime?          @map("date_of_birth") @db.Date
   birthYearOnly     Boolean            @default(false) @map("birth_year_only")
   dateOfDeath       DateTime?          @map("date_of_death") @db.Date
+  /// Chỉ biết năm mất (date_of_death lưu ngày 1/1 của năm đó): không suy ra ngày giỗ từ đây.
+  deathYearOnly     Boolean            @default(false) @map("death_year_only")
   hometown          String?            @db.VarChar(255)
   currentPlace      String?            @map("current_place") @db.VarChar(255)
   phone             String?            @db.VarChar(20)
