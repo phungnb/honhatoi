@@ -18,6 +18,11 @@ import { SITE } from "@/lib/site";
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 type Method = "phone" | "email";
+/**
+ * Đăng nhập bằng SĐT cần nhà cung cấp SMS (chưa tích hợp): ẩn tới khi đặt
+ * NEXT_PUBLIC_PHONE_LOGIN=1, tránh người dùng chờ mã không bao giờ tới.
+ */
+const PHONE_LOGIN = process.env.NEXT_PUBLIC_PHONE_LOGIN === "1";
 
 interface TokenBody {
   data?: { accessToken?: string; refreshToken?: string };
@@ -50,7 +55,7 @@ const inputStyle: CSSProperties = {
 
 export default function DangNhapPage() {
   const router = useRouter();
-  const [method, setMethod] = useState<Method>("phone");
+  const [method, setMethod] = useState<Method>(PHONE_LOGIN ? "phone" : "email");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -239,10 +244,12 @@ export default function DangNhapPage() {
           </>
         )}
 
-        <div className="btn-row" style={{ marginBottom: 16 }}>
-          {tab("phone", "Số điện thoại")}
-          {tab("email", "Email")}
-        </div>
+        {PHONE_LOGIN && (
+          <div className="btn-row" style={{ marginBottom: 16 }}>
+            {tab("phone", "Số điện thoại")}
+            {tab("email", "Email")}
+          </div>
+        )}
 
         {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
 

@@ -5,6 +5,9 @@ import { corsOrigins } from './common/cors';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Sau reverse proxy (nginx/Vercel): lấy IP thật từ X-Forwarded-For để
+  // giới hạn tần suất theo từng người, không theo IP của proxy.
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
 
   // Chuẩn response theo spec 3.1 — mọi endpoint dưới /api/v1.
   app.setGlobalPrefix('api/v1');

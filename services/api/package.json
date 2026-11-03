@@ -6,6 +6,7 @@
     "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/platform-socket.io": "^11.0.0",
+    "@nestjs/throttler": "^6.7.1",
     "@nestjs/websockets": "^11.0.0",
     "@prisma/client": "^5.20.0",
     "argon2": "^0.41.1",
@@ -41,7 +42,8 @@
     "start": "nest start",
     "start:debug": "nest start --debug --watch",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "test": "TS_NODE_TRANSPILE_ONLY=1 node --require ts-node/register --test test/*.test.ts"
   },
   "version": "1.0.0",
   "engines": {

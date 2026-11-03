@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class CreatePersonDto {
   @IsString()
@@ -32,6 +32,23 @@ export class CreatePersonDto {
   @IsOptional()
   @IsString()
   burialPlace?: string;
+
+  /** Ngày mất âm lịch (1–30), dùng tính ngày giỗ khi không rõ ngày dương. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  deathLunarDay?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  deathLunarMonth?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  deathLunarLeap?: boolean;
 
   @IsOptional()
   @IsInt()

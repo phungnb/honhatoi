@@ -16,6 +16,8 @@ import { corsOrigins } from '../dist/common/cors';
  * serverless — các API REST vẫn chạy bình thường.
  */
 const expressApp = express();
+// IP thật từ X-Forwarded-For cho giới hạn tần suất (ThrottlerGuard).
+expressApp.set('trust proxy', true);
 let ready: Promise<void> | null = null;
 
 async function bootstrap(): Promise<void> {
