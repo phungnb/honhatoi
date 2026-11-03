@@ -368,6 +368,7 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
     setPersons(persons.map((p) => ({ ...p, sortOrder: ids.indexOf(p.id) })));
     try {
       await put(`/genealogy/lineages/${lineageId}/persons/order`, { ids });
+      await load();
     } catch (e) {
       setPersons(prev);
       setError(apiMessage(e));

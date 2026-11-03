@@ -490,16 +490,22 @@ export class GenealogyService {
     const uniq = Array.from(new Set(ids));
     const found = await this.prisma.familyPerson.findMany({
       where: { id: { in: uniq }, lineageId, deletedAt: null },
-      select: { id: true, sortOrder: true },
+      select: { id: true, sortOrder: true, updatedAt: true },
     });
     if (found.length !== uniq.length)
       throw new BadRequestException({ code: 'INVALID_PERSON', message: 'Có người không thuộc dòng họ này' });
     const cur = new Map(found.map((p) => [p.id, p.sortOrder]));
+    const stamp = new Map(found.map((p) => [p.id, p.updatedAt]));
     // Chỉ ghi những người đổi chỗ để giao dịch ngắn.
     const changed = uniq.map((id, i) => ({ id, i })).filter(({ id, i }) => cur.get(id) !== i);
     await this.prisma.$transaction(async (tx) => {
       for (const { id, i } of changed)
-        await tx.familyPerson.update({ where: { id }, data: { sortOrder: i } });
+        // Giữ nguyên updatedAt: đổi thứ tự không phải sửa hồ sơ, nếu không
+        // form đang mở sẽ bị báo nhầm "người khác vừa sửa" (409 PERSON_CHANGED).
+        await tx.familyPerson.update({
+          where: { id },
+          data: { sortOrder: i, updatedAt: stamp.get(id) },
+        });
       await this.audit(tx as never, lineageId, userId, 'genealogy.person.reorder', 'lineage', lineageId, {
         count: changed.length,
       });
