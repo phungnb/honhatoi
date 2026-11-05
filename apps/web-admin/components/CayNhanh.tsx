@@ -19,6 +19,8 @@ export interface CayPerson {
   sortOrder?: number | null;
   generation?: number | null;
   roleInLineage?: string | null;
+  /** URL ký có hạn của ảnh chân dung (tương đối với API), null nếu chưa có. */
+  avatarUrl?: string | null;
 }
 
 export interface CayRelationship {

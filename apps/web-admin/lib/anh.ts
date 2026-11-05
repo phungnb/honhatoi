@@ -43,3 +43,33 @@ export async function nenAnh(file: File): Promise<AnhDaNen> {
   if (blob.size > MAX_BYTES) throw new Error("Ảnh quá lớn sau khi nén (trên 4 MB)");
   return { blob, width: w, height: h, type: "image/jpeg" };
 }
+
+/**
+ * Ảnh chân dung cho cây gia phả: cắt vuông giữa ảnh, 512×512, JPEG 0,85.
+ * Khung tròn trên cây chỉ 64 px nên ảnh nhỏ là đủ nét, tải nhanh trên 3G.
+ */
+export async function nenChanDung(file: File): Promise<Blob> {
+  let bmp: ImageBitmap;
+  try {
+    bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new Error("Không đọc được ảnh này (định dạng chưa hỗ trợ). Hãy chọn ảnh JPG hoặc PNG.");
+  }
+  const side = Math.min(bmp.width, bmp.height);
+  // Ảnh dọc (chân dung): lấy phần trên nhiều hơn để không cắt mất đầu.
+  const sx = (bmp.width - side) / 2;
+  const sy = bmp.height > bmp.width ? (bmp.height - side) * 0.25 : 0;
+  const out = Math.min(512, side);
+  const canvas = document.createElement("canvas");
+  canvas.width = out;
+  canvas.height = out;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Trình duyệt không xử lý được ảnh");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, out, out);
+  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, out, out);
+  bmp.close();
+  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+  if (!blob) throw new Error("Không nén được ảnh");
+  return blob;
+}

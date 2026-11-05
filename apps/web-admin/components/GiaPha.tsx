@@ -31,6 +31,7 @@ interface TreePerson {
   generation?: number | null;
   branch?: string | null;
   roleInLineage?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface KinshipResult {
@@ -521,7 +522,15 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
         </div>
       )}
 
-      {openId && <HoSoNguoi personId={openId} demo={demo} onClose={() => setOpenId(null)} />}
+      {openId && (
+        <HoSoNguoi
+          personId={openId}
+          demo={demo}
+          suaAnh={!demo && !!member.current && canManageLineage(member.current)}
+          onAnh={(id, url) => setPersons((ps) => ps.map((x) => (x.id === id ? { ...x, avatarUrl: url } : x)))}
+          onClose={() => setOpenId(null)}
+        />
+      )}
     </>
   );
 }

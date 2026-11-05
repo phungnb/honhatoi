@@ -11,9 +11,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as RPointerEvent } from "react";
 import { CayPerson, CayRelationship, daMat, dungCay, years } from "@/components/CayNhanh";
+import { apiUrl } from "@/lib/api";
 
-const W = 156; // rộng một khung người
-const H = 72; // cao một khung người
+const W = 148; // rộng một khung người
+const H = 140; // cao một khung người: ảnh tròn ở trên, tên và năm ở dưới
 const GAP_SPOUSE = 10;
 const GAP_X = 28; // khoảng cách giữa các nhánh anh em
 const GAP_Y = 64; // khoảng cách giữa hai đời
@@ -61,6 +62,12 @@ function junction(n: Node, via: number): { x: number; y: number } {
   if (Math.abs(sp[via] - main) === 1) return { x: (Math.min(sx, mainX) + W + Math.max(sx, mainX)) / 2, y: n.y + H / 2 };
   return { x: sx + W / 2, y: n.y + H };
 }
+/** URL ảnh chân dung: đường dẫn ký của API, hoặc URL https ngoài giữ nguyên. */
+export const anhUrl = (u: string) => (/^https:\/\//.test(u) ? u : apiUrl(u));
+
+/** Chữ cái đầu của tên gọi (chữ cuối trong họ tên) làm ảnh thay thế. */
+const chuDau = (ten: string) => ten.trim().split(/\s+/).pop()?.[0]?.toUpperCase() ?? "?";
+
 export default function SoDoCay({
   persons,
   relationships,
@@ -364,6 +371,13 @@ export default function SoDoCay({
         style={{ left: PAD + x, top: PAD + y, width: W, height: H }}
         onClick={() => open(id)}
       >
+        <span className="sd-anh" aria-hidden>
+          {p.avatarUrl ? (
+            <img src={anhUrl(p.avatarUrl)} alt="" draggable={false} decoding="async" />
+          ) : (
+            <span className="chu">{chuDau(p.fullName)}</span>
+          )}
+        </span>
         <strong>{p.fullName}</strong>
         {sub && <span className="sub">{sub}</span>}
       </button>

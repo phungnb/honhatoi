@@ -12,10 +12,13 @@ import {
   Put,
   Query,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
-import { GenealogyService } from './genealogy.service';
+import { GenealogyService, MAX_AVATAR_BYTES } from './genealogy.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { CreateRelationshipDto } from './dto/create-relationship.dto';
@@ -127,6 +130,23 @@ export class GenealogyController {
     @Body() dto: UpdatePersonDto,
   ) {
     return this.genealogy.updatePerson(id, userId, dto);
+  }
+
+  @Post('persons/:id/avatar')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_AVATAR_BYTES, files: 1, fields: 5 } }),
+  )
+  setAvatar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUserId() userId: string,
+    @UploadedFile() file: { buffer: Buffer; size: number } | undefined,
+  ) {
+    return this.genealogy.setAvatar(id, userId, file);
+  }
+
+  @Delete('persons/:id/avatar')
+  removeAvatar(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
+    return this.genealogy.removeAvatar(id, userId);
   }
 
   @Delete('persons/:id')

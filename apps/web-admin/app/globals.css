@@ -1140,14 +1140,15 @@ blockquote.trich-dan {
   white-space: nowrap;
   box-shadow: 0 1px 2px rgba(58, 35, 20, 0.35);
 }
-/* Thẻ người: như thẻ bài trên giấy, nam viền son, nữ viền kim. */
+/* Thẻ người: như thẻ bài trên giấy, nam viền son, nữ viền kim. Ảnh tròn ở trên. */
 .sd-box {
   position: absolute;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: 6px 8px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1px;
+  padding: 8px 8px 6px;
   border-radius: 6px;
   border: 1px solid var(--kim-nhat);
   border-top: 3px solid var(--son);
@@ -1181,6 +1182,64 @@ blockquote.trich-dan {
 }
 .sd-box.female {
   border-top-color: var(--kim);
+}
+/* Khung ảnh tròn: viền vàng kim, chỉ son mảnh bên trong như khung ảnh thờ. */
+.sd-anh {
+  flex: 0 0 auto;
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from 210deg, #8a6420, #e7c46c, #b5882f, #f1d78f, #8a6420);
+  box-shadow: 0 1px 3px rgba(58, 35, 20, 0.35);
+}
+.sd-anh::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(155, 28, 28, 0.55);
+  pointer-events: none;
+}
+.sd-anh img,
+.sd-anh .chu {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+.sd-anh img {
+  object-fit: cover;
+  background: var(--giay);
+}
+/* Chưa có ảnh: chữ cái đầu tên gọi trên nền giấy có vân tròn. */
+.sd-anh .chu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 5px, rgba(181, 136, 47, 0.13) 5px 6px),
+    radial-gradient(circle at 35% 30%, #fffaf0, #efdcb2);
+  color: var(--son);
+  font-family: var(--font-serif);
+  font-size: 1.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.sd-box.female .sd-anh .chu {
+  color: #8a5a12;
+}
+/* Người đã mất: ảnh ngả nâu cũ, viền vàng trầm. */
+.sd-box.dead .sd-anh {
+  background: conic-gradient(from 210deg, #5e5040, #a8957a, #6f604c, #b9a78b, #5e5040);
+}
+.sd-box.dead .sd-anh img {
+  filter: sepia(0.75) saturate(0.8) contrast(0.95);
+}
+.sd-box.dead .sd-anh .chu {
+  color: #6e5238;
 }
 .sd-box.spouse {
   border-style: dashed;
@@ -1250,6 +1309,53 @@ blockquote.trich-dan {
   margin-top: 10px;
   min-height: 26px;
   font-size: 0.8125rem;
+}
+
+/* Ảnh chân dung trong hồ sơ người: khung tròn viền vàng kim như trên cây. */
+.hs-anh {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  padding: 3px;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #8a6420, #e7c46c, #b5882f, #f1d78f, #8a6420);
+}
+.hs-anh img,
+.hs-anh .chu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.hs-anh .chu {
+  background: radial-gradient(circle at 35% 30%, #fffaf0, #efdcb2);
+  color: #9b1c1c;
+  font-family: var(--font-serif);
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+.hs-anh.female .chu {
+  color: #8a5a12;
+}
+.hs-anh.dead {
+  background: conic-gradient(from 210deg, #5e5040, #a8957a, #6f604c, #b9a78b, #5e5040);
+}
+.hs-anh.dead img {
+  filter: sepia(0.75) saturate(0.8) contrast(0.95);
+}
+.hs-anh-nut {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hs-anh-nut .btn {
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
 }
 
 /* ===== Tab Dòng họ: bảng tin, danh bạ ===== */
