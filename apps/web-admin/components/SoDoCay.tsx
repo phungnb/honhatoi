@@ -11,15 +11,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as RPointerEvent } from "react";
 import { CayPerson, CayRelationship, daMat, dungCay, years } from "@/components/CayNhanh";
+import { apiUrl } from "@/lib/api";
 
-const W = 156; // rộng một khung người
-const H = 72; // cao một khung người
+const W = 172; // rộng một khung người: đủ chỗ cho tên 4 chữ ở cỡ chữ lớn
+const H = 150; // cao một khung người: ảnh tròn ở trên, tên và năm ở dưới
 const GAP_SPOUSE = 10;
 const GAP_X = 28; // khoảng cách giữa các nhánh anh em
 const GAP_Y = 64; // khoảng cách giữa hai đời
 const PAD = 32;
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 2.5;
+/** Thu nhỏ dưới mức này thì chữ thường không đọc nổi: thẻ chỉ còn tên gọi, chữ to. */
+const XA = 0.6;
 
 interface Node {
   id: string; // người trong họ (người có cha mẹ trong cây hoặc người gốc)
@@ -61,6 +64,12 @@ function junction(n: Node, via: number): { x: number; y: number } {
   if (Math.abs(sp[via] - main) === 1) return { x: (Math.min(sx, mainX) + W + Math.max(sx, mainX)) / 2, y: n.y + H / 2 };
   return { x: sx + W / 2, y: n.y + H };
 }
+/** URL ảnh chân dung: đường dẫn ký của API, hoặc URL https ngoài giữ nguyên. */
+export const anhUrl = (u: string) => (/^https:\/\//.test(u) ? u : apiUrl(u));
+
+/** Chữ cái đầu của tên gọi (chữ cuối trong họ tên) làm ảnh thay thế. */
+const chuDau = (ten: string) => ten.trim().split(/\s+/).pop()?.[0]?.toUpperCase() ?? "?";
+
 export default function SoDoCay({
   persons,
   relationships,
@@ -364,8 +373,18 @@ export default function SoDoCay({
         style={{ left: PAD + x, top: PAD + y, width: W, height: H }}
         onClick={() => open(id)}
       >
+        <span className="sd-anh" aria-hidden>
+          {p.avatarUrl ? (
+            <img src={anhUrl(p.avatarUrl)} alt="" draggable={false} decoding="async" />
+          ) : (
+            <span className="chu">{chuDau(p.fullName)}</span>
+          )}
+        </span>
         <strong>{p.fullName}</strong>
         {sub && <span className="sub">{sub}</span>}
+        <span className="ten-goi" aria-hidden>
+          {p.fullName.trim().split(/\s+/).pop()}
+        </span>
       </button>
     );
   };
@@ -405,11 +424,12 @@ export default function SoDoCay({
               onPointerCancel={onUp}
             >
               <div
-                className="sd-canvas"
+                className={`sd-canvas${t.s < XA ? " xa" : ""}`}
                 style={{
                   width: layout.width,
                   height: layout.height,
                   transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})`,
+                  ["--s" as string]: t.s,
                 }}
               >
                 <svg width={layout.width} height={layout.height} className="sd-lines" aria-hidden>

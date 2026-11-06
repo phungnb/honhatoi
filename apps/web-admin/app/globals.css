@@ -1103,8 +1103,8 @@ blockquote.trich-dan {
 }
 .sd-lines path {
   fill: none;
-  stroke: var(--muc-nhat);
-  stroke-width: 1.5;
+  stroke: #5a3d26;
+  stroke-width: 2;
 }
 /* Thân cuốn thư: cột "Đời" bên trái, khung cây bên phải. */
 .ct-than {
@@ -1118,7 +1118,7 @@ blockquote.trich-dan {
 }
 .ct-doi {
   position: relative;
-  flex: 0 0 46px;
+  flex: 0 0 54px;
   overflow: hidden;
   border-right: 1px solid var(--kim-nhat);
   pointer-events: none;
@@ -1133,25 +1133,26 @@ blockquote.trich-dan {
   background: var(--son);
   color: #fbeccb;
   font-family: var(--font-serif);
-  font-size: 0.6875rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 700;
   line-height: 1.3;
   text-align: center;
   white-space: nowrap;
   box-shadow: 0 1px 2px rgba(58, 35, 20, 0.35);
 }
-/* Thẻ người: như thẻ bài trên giấy, nam viền son, nữ viền kim. */
+/* Thẻ người: như thẻ bài trên giấy, nam viền son, nữ viền kim. Ảnh tròn ở trên. */
 .sd-box {
   position: absolute;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: 6px 8px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1px;
+  padding: 8px 8px 6px;
   border-radius: 6px;
-  border: 1px solid var(--kim-nhat);
-  border-top: 3px solid var(--son);
-  background: #fbf3e0;
+  border: 1px solid rgba(110, 82, 56, 0.55);
+  border-top: 4px solid var(--son);
+  background: #fffbf2;
   color: var(--muc);
   font-family: var(--font-serif);
   text-align: center;
@@ -1159,9 +1160,11 @@ blockquote.trich-dan {
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(58, 35, 20, 0.18);
 }
+/* Chữ to, mực đậm trên nền sáng: người lớn tuổi đọc được không cần phóng to. */
 .sd-box strong {
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
   font-weight: 700;
+  color: #24140a;
   /* Dòng cao 1.35 để dấu chồng (Nguyễn, Tổ) không bị cắt khi tên xuống hai dòng. */
   line-height: 1.35;
   display: -webkit-box;
@@ -1171,24 +1174,107 @@ blockquote.trich-dan {
 }
 .sd-box .sub {
   font-family: var(--font);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
   line-height: 1.4;
-  color: var(--muc-nhat);
+  color: #4a3220;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }
 .sd-box.female {
-  border-top-color: var(--kim);
+  border-top-color: #a87414;
+}
+/* Nhìn xa (thu nhỏ cả cây): bỏ ảnh và năm, chỉ hiện tên gọi thật to để
+   người lớn tuổi vẫn đọc được trên điện thoại. Cỡ chữ bù theo tỉ lệ thu nhỏ. */
+.sd-box .ten-goi {
+  display: none;
+}
+.sd-canvas.xa .sd-box {
+  justify-content: center;
+  padding: 6px;
+}
+.sd-canvas.xa .sd-anh,
+.sd-canvas.xa .sd-box strong,
+.sd-canvas.xa .sd-box .sub {
+  display: none;
+}
+.sd-canvas.xa .sd-box .ten-goi {
+  display: block;
+  max-width: 100%;
+  font-family: var(--font-serif);
+  font-size: min(44px, calc(13px / var(--s, 1)));
+  font-weight: 700;
+  line-height: 1.2;
+  color: #24140a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Khung ảnh tròn: viền vàng kim, chỉ son mảnh bên trong như khung ảnh thờ. */
+.sd-anh {
+  flex: 0 0 auto;
+  position: relative;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from 210deg, #8a6420, #e7c46c, #b5882f, #f1d78f, #8a6420);
+  box-shadow: 0 1px 3px rgba(58, 35, 20, 0.35);
+}
+.sd-anh::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(155, 28, 28, 0.55);
+  pointer-events: none;
+}
+.sd-anh img,
+.sd-anh .chu {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+.sd-anh img {
+  object-fit: cover;
+  background: var(--giay);
+}
+/* Chưa có ảnh: chữ cái đầu tên gọi trên nền giấy có vân tròn. */
+.sd-anh .chu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 5px, rgba(181, 136, 47, 0.13) 5px 6px),
+    radial-gradient(circle at 35% 30%, #fffaf0, #efdcb2);
+  color: rgba(155, 28, 28, 0.6);
+  font-family: var(--font-serif);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.sd-box.female .sd-anh .chu {
+  color: rgba(138, 90, 18, 0.7);
+}
+/* Người đã mất: ảnh ngả nâu cũ, viền vàng trầm. */
+.sd-box.dead .sd-anh {
+  background: conic-gradient(from 210deg, #5e5040, #a8957a, #6f604c, #b9a78b, #5e5040);
+}
+.sd-box.dead .sd-anh img {
+  filter: sepia(0.75) saturate(0.8) contrast(0.95);
+}
+.sd-box.dead .sd-anh .chu {
+  color: rgba(110, 82, 56, 0.7);
 }
 .sd-box.spouse {
   border-style: dashed;
   border-top-style: solid;
 }
-.sd-box.dead strong {
-  opacity: 0.8;
-}
+
 .sd-box.root {
   box-shadow:
     0 0 0 2px var(--son),
@@ -1201,15 +1287,15 @@ blockquote.trich-dan {
 }
 .sd-fold {
   position: absolute;
-  min-width: 28px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 11px;
+  min-width: 32px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 13px;
   border: 1px solid var(--kim);
   background: #fbf3e0;
   color: var(--son);
   font-family: var(--font);
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -1250,6 +1336,53 @@ blockquote.trich-dan {
   margin-top: 10px;
   min-height: 26px;
   font-size: 0.8125rem;
+}
+
+/* Ảnh chân dung trong hồ sơ người: khung tròn viền vàng kim như trên cây. */
+.hs-anh {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  padding: 3px;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #8a6420, #e7c46c, #b5882f, #f1d78f, #8a6420);
+}
+.hs-anh img,
+.hs-anh .chu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.hs-anh .chu {
+  background: radial-gradient(circle at 35% 30%, #fffaf0, #efdcb2);
+  color: #9b1c1c;
+  font-family: var(--font-serif);
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+.hs-anh.female .chu {
+  color: #8a5a12;
+}
+.hs-anh.dead {
+  background: conic-gradient(from 210deg, #5e5040, #a8957a, #6f604c, #b9a78b, #5e5040);
+}
+.hs-anh.dead img {
+  filter: sepia(0.75) saturate(0.8) contrast(0.95);
+}
+.hs-anh-nut {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hs-anh-nut .btn {
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
 }
 
 /* ===== Tab Dòng họ: bảng tin, danh bạ ===== */
@@ -1803,7 +1936,7 @@ blockquote.trich-dan {
   border-style: dashed;
   border-color: #8a6a45;
   border-top-style: solid;
-  background: #f1e4c6;
+  background: #f6ecd6;
 }
 .sd-fold.ngoai {
   border-color: #8a6a45;

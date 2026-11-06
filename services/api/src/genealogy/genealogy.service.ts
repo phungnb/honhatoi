@@ -26,6 +26,8 @@ import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DEMO_LINEAGE_ID } from '../common/demo';
 import { foldVietnamese } from '../common/text';
 import { diffFields, staleFields } from './history';
+import { StorageService, sniffImage } from '../storage/storage.service';
+import { randomUUID } from 'crypto';
 
 /**
  * GenealogyService — triển khai đầy đủ module Gia phả.
@@ -51,6 +53,9 @@ const INVERSE: Record<string, string> = {
 const PARENT_TYPES = ['parent', 'adoptive_parent'];
 const SPOUSE_TYPES = ['spouse', 'ex_spouse'];
 /** Trường nhạy cảm: chỉ người có canEdit mới thấy đầy đủ. */
+/** Ảnh chân dung tối đa 4 MB sau khi trình duyệt đã nén (Vercel giới hạn 4,5 MB/request). */
+export const MAX_AVATAR_BYTES = 4 * 1024 * 1024;
+
 const SENSITIVE_FIELDS = ['phone', 'email', 'bloodType', 'currentPlace'] as const;
 /** Dưới tuổi này, người chỉ có quyền xem chỉ thấy năm sinh. */
 const CHILD_AGE = 16;
@@ -80,6 +85,7 @@ export class GenealogyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly storage: StorageService,
   ) {}
 
   // ---------------------------------------------------------------- helpers
@@ -147,10 +153,14 @@ export class GenealogyService {
 
   /** Ẩn trường nhạy cảm với người chỉ có quyền xem. */
   private sanitize<T>(person: T, canEdit: boolean): T {
-    if (canEdit || !person) return person;
+    if (!person) return person;
     const copy: Record<string, unknown> = {
       ...(person as unknown as Record<string, unknown>),
     };
+    // Ảnh chân dung lưu dạng khóa "file:<key>" trong kho riêng tư: đổi sang URL
+    // ký có hạn để thẻ <img> đọc được, không lộ khóa gốc.
+    copy['avatarUrl'] = this.avatarOut(copy['avatarUrl']);
+    if (canEdit) return copy as T;
     for (const f of SENSITIVE_FIELDS) delete copy[f];
     // Hồ sơ trẻ em: ẩn ngày/tháng sinh, chỉ giữ năm.
     const dob = copy['dateOfBirth'];
@@ -217,7 +227,7 @@ export class GenealogyService {
     const allowed = [
       'fullName',
       'nickname',
-      'avatarUrl',
+      // avatarUrl không sửa qua form: chỉ đổi qua POST/DELETE /persons/:id/avatar.
       'gender',
       'birthYearOnly',
       'deathYearOnly',
@@ -483,6 +493,73 @@ export class GenealogyService {
    * - có canEdit → cập nhật trực tiếp
    * - chỉ có canPropose → tạo đề xuất update_person + chuyển person sang pending_verification
    */
+  /** Đường dẫn ảnh chân dung trả cho client: khóa kho → URL ký; URL ngoài giữ nguyên. */
+  private avatarOut(v: unknown): string | null {
+    if (typeof v !== 'string' || !v) return null;
+    if (v.startsWith('file:')) {
+      if (!this.storage.enabled()) return null;
+      return this.storage.signedPath(v.slice(5));
+    }
+    return /^https:\/\//.test(v) ? v : null;
+  }
+
+  /**
+   * POST /genealogy/persons/:id/avatar (multipart: file) — đặt ảnh chân dung.
+   * Cần quyền sửa gia phả. Ảnh cũ do hệ thống lưu được xóa sau khi ghi xong.
+   */
+  async setAvatar(
+    personId: string,
+    userId: string,
+    file: { buffer: Buffer; size: number } | undefined,
+  ) {
+    const person = await this.getPersonOrThrow(personId);
+    const perm = await this.effectivePerm(person.lineageId, userId);
+    this.require(perm, 'canEdit', 'đổi ảnh chân dung');
+    if (!file?.buffer?.length)
+      throw new BadRequestException({ code: 'FILE_REQUIRED', message: 'Chưa chọn ảnh' });
+    if (file.size > MAX_AVATAR_BYTES)
+      throw new BadRequestException({ code: 'FILE_TOO_LARGE', message: 'Ảnh quá 4 MB' });
+    const kind = sniffImage(file.buffer);
+    if (!kind || kind.ext === 'gif')
+      throw new BadRequestException({
+        code: 'FILE_TYPE_NOT_ALLOWED',
+        message: 'Chỉ nhận ảnh JPG, PNG hoặc WebP',
+      });
+    const key = `persons/${person.lineageId}/${personId}/${randomUUID()}.${kind.ext}`;
+    await this.storage.put(key, file.buffer, kind.mime);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.familyPerson.update({
+        where: { id: personId },
+        data: { avatarUrl: `file:${key}`, updatedBy: userId },
+      });
+      await this.audit(tx as never, person.lineageId, userId, 'genealogy.person.avatar', 'family_person', personId, {
+        action: 'set',
+      });
+      return u;
+    });
+    if (person.avatarUrl?.startsWith('file:')) await this.storage.remove(person.avatarUrl.slice(5));
+    return { data: { person: this.sanitize(updated, true) }, error: null };
+  }
+
+  /** DELETE /genealogy/persons/:id/avatar — bỏ ảnh chân dung. */
+  async removeAvatar(personId: string, userId: string) {
+    const person = await this.getPersonOrThrow(personId);
+    const perm = await this.effectivePerm(person.lineageId, userId);
+    this.require(perm, 'canEdit', 'đổi ảnh chân dung');
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.familyPerson.update({
+        where: { id: personId },
+        data: { avatarUrl: null, updatedBy: userId },
+      });
+      await this.audit(tx as never, person.lineageId, userId, 'genealogy.person.avatar', 'family_person', personId, {
+        action: 'remove',
+      });
+      return u;
+    });
+    if (person.avatarUrl?.startsWith('file:')) await this.storage.remove(person.avatarUrl.slice(5));
+    return { data: { person: this.sanitize(updated, true) }, error: null };
+  }
+
   /** Đặt lại thứ tự người trong họ theo danh sách id (cần quyền sửa gia phả). */
   async reorderPersons(lineageId: string, userId: string, ids: string[]) {
     const perm = await this.effectivePerm(lineageId, userId);

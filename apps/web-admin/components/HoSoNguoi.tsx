@@ -9,15 +9,18 @@
  * API tạo đề xuất chờ Ban quản trị duyệt (PATCH /genealogy/persons/:id).
  */
 
-import { useEffect, useState } from "react";
-import { del, get, patch, post } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { del, get, patch, post, upload } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import { nenChanDung } from "@/lib/anh";
 import { daMat } from "@/components/CayNhanh";
+import { anhUrl } from "@/components/SoDoCay";
 
 interface Person {
   id: string;
   fullName: string;
   nickname?: string | null;
+  avatarUrl?: string | null;
   gender?: string | null;
   dateOfBirth?: string | null;
   birthYearOnly?: boolean;
@@ -55,10 +58,16 @@ function fmtDate(iso?: string | null, yearOnly?: boolean): string {
 export default function HoSoNguoi({
   personId,
   demo = false,
+  suaAnh = false,
+  onAnh,
   onClose,
 }: {
   personId: string;
   demo?: boolean;
+  /** Người xem có quyền sửa gia phả: hiện nút thêm/đổi/bỏ ảnh chân dung. */
+  suaAnh?: boolean;
+  /** Báo cho cây cập nhật ảnh của người này mà không phải tải lại cả cây. */
+  onAnh?: (personId: string, avatarUrl: string | null) => void;
   onClose: () => void;
 }) {
   const [p, setP] = useState<Person | null>(null);
@@ -67,6 +76,43 @@ export default function HoSoNguoi({
   const [reload, setReload] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [anhBusy, setAnhBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function chonAnh(f: File | undefined) {
+    if (!f || !p) return;
+    setAnhBusy(true);
+    setMsg(null);
+    try {
+      const blob = await nenChanDung(f);
+      const form = new FormData();
+      form.append("file", blob, "chan-dung.jpg");
+      const b = await upload<{ data?: { person?: Person } }>(`/genealogy/persons/${p.id}/avatar`, form);
+      const url = b?.data?.person?.avatarUrl ?? null;
+      setP((x) => (x ? { ...x, avatarUrl: url, updatedAt: b?.data?.person?.updatedAt ?? x.updatedAt } : x));
+      onAnh?.(p.id, url);
+    } catch (e) {
+      setMsg(apiMessage(e));
+    } finally {
+      setAnhBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function boAnh() {
+    if (!p || !confirm("Bỏ ảnh chân dung của người này?")) return;
+    setAnhBusy(true);
+    setMsg(null);
+    try {
+      const b = await del<{ data?: { person?: Person } }>(`/genealogy/persons/${p.id}/avatar`);
+      setP((x) => (x ? { ...x, avatarUrl: null, updatedAt: b?.data?.person?.updatedAt ?? x.updatedAt } : x));
+      onAnh?.(p.id, null);
+    } catch (e) {
+      setMsg(apiMessage(e));
+    } finally {
+      setAnhBusy(false);
+    }
+  }
 
   useEffect(() => {
     setP(null);
@@ -131,16 +177,38 @@ export default function HoSoNguoi({
           <>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <div
-                className={`avatar${p.gender === "female" ? " female" : ""}${daMat(p) ? " dead" : ""}`}
-                style={{ width: 52, height: 52, fontSize: 20 }}
+                className={`hs-anh${p.gender === "female" ? " female" : ""}${daMat(p) ? " dead" : ""}`}
               >
-                {p.fullName.trim().split(/\s+/).pop()?.[0] ?? "?"}
+                {p.avatarUrl ? (
+                  <img src={anhUrl(p.avatarUrl)} alt={`Ảnh ${p.fullName}`} />
+                ) : (
+                  <span className="chu">{p.fullName.trim().split(/\s+/).pop()?.[0]?.toUpperCase() ?? "?"}</span>
+                )}
               </div>
               <div className="grow">
                 <h2 style={{ fontSize: 20 }}>{p.fullName}</h2>
                 <span className={`badge ${daMat(p) ? "warm" : "brand"}`}>
                   {daMat(p) ? "Đã mất" : "Đang sống"}
                 </span>
+                {suaAnh && !demo && (
+                  <div className="hs-anh-nut">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => chonAnh(e.target.files?.[0])}
+                    />
+                    <button className="btn" disabled={anhBusy} onClick={() => fileRef.current?.click()}>
+                      {anhBusy ? "Đang tải ảnh…" : p.avatarUrl ? "Đổi ảnh" : "Thêm ảnh"}
+                    </button>
+                    {p.avatarUrl && (
+                      <button className="btn" disabled={anhBusy} onClick={boAnh}>
+                        Bỏ ảnh
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <dl className="kv">
