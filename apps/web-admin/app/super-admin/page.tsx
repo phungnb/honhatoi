@@ -12,6 +12,13 @@ import Link from "next/link";
 import { get } from "@/lib/api";
 import DoiSoHo from "@/components/DoiSoHo";
 
+
+/** Nhãn tiếng Việt cho chế độ hiển thị dòng họ (giá trị lưu trong DB). */
+const CHE_DO: Record<string, string> = {
+  invite_only: "Chỉ người được mời",
+  private: "Riêng tư",
+  public: "Công khai",
+};
 interface AdminLineage {
   id: string;
   name: string;
@@ -115,7 +122,7 @@ export default function SuperAdminPage() {
                         {l.name}
                       </Link>
                     </td>
-                    <td style={{ color: "var(--muted)" }}>{l.visibility}</td>
+                    <td style={{ color: "var(--muted)" }}>{CHE_DO[l.visibility] ?? l.visibility}</td>
                     <td>{l._count.memberships}</td>
                     <td>{l._count.persons}</td>
                     <td style={{ color: "var(--muted)" }}>

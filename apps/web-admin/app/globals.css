@@ -385,6 +385,7 @@ tbody tr:hover {
 
 .btn-row {
   display: flex;
+  flex-wrap: wrap; /* điện thoại hẹp: nút xuống dòng thay vì tràn ra ngoài (nút Đóng bị khuất) */
   gap: 8px;
 }
 
@@ -1301,11 +1302,10 @@ blockquote.trich-dan {
   cursor: pointer;
   z-index: 1;
 }
+/* Nút công cụ nằm dưới khung cây (không đè lên thẻ người ở hàng cuối). */
 .sd-tools {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 18px;
+  position: relative;
+  margin: 8px 4px 0;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;

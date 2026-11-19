@@ -123,9 +123,11 @@ function personName(p: Proposal): string {
 function diffRows(p: Proposal): { field: string; old: unknown; next: unknown }[] {
   const before = p.payload?.before ?? {};
   const after = p.payload?.after ?? {};
-  const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
-  return keys
-    .filter((k) => FIELD_LABEL[k] && before[k] !== after[k])
+  // Chỉ các trường có trong "after" mới được ghi khi duyệt; trường vắng mặt
+  // giữ nguyên, nên không được hiện như thể bị xóa thành "—".
+  const same = (a: unknown, b: unknown) => (a ?? null) === (b ?? null);
+  return Object.keys(after)
+    .filter((k) => FIELD_LABEL[k] && !same(before[k], after[k]))
     .map((k) => ({ field: FIELD_LABEL[k], old: before[k], next: after[k] }));
 }
 
