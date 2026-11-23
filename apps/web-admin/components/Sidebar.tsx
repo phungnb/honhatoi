@@ -62,6 +62,7 @@ export default function Sidebar() {
         { href: "/app/tin-nhan", label: "Tin nhắn", short: "Tin nhắn", mobile: true, icon: "tin-nhan" },
         { href: "/app/dong-ho", label: "Dòng họ", short: "Dòng họ", mobile: true, icon: "dong-ho" },
         { href: "/app/lich-am", label: "Lịch âm dương", short: "Lịch", mobile: false, icon: "lich" },
+        { href: "/van-khan", label: "Văn khấn", short: "Văn khấn", mobile: false, icon: "huong" },
         {
           href: "/app/thong-bao",
           label: unread > 0 ? `Thông báo (${unread})` : "Thông báo",
@@ -79,6 +80,7 @@ export default function Sidebar() {
     : [
         { href: "/app", label: "Giới thiệu", short: "Giới thiệu", mobile: true, icon: "trang-chu" },
         { href: "/mau", label: "Dòng họ mẫu", short: "Họ mẫu", mobile: true, icon: "gia-pha" },
+        { href: "/van-khan", label: "Văn khấn", short: "Văn khấn", mobile: true, icon: "huong" },
         { href: "/dang-nhap", label: "Đăng nhập", short: "Đăng nhập", mobile: true, icon: "dang-nhap" },
       ];
   const isActive = (href: string) =>
@@ -140,7 +142,7 @@ export default function Sidebar() {
           Một tài khoản cho mọi vai trò: Thành viên, Người giữ gia phả, Ban
           quản trị, Chủ gia phả.
           <div style={{ marginTop: 8 }}>
-            <Link href="/dieu-khoan">Điều khoản</Link> · <Link href="/quyen-rieng-tu">Quyền riêng tư</Link>
+            <Link href="/dieu-khoan">Điều khoản</Link> · <Link href="/quyen-rieng-tu">Quyền riêng tư</Link> · <Link href="/lien-he">Liên hệ</Link>
           </div>
         </div>
       </aside>

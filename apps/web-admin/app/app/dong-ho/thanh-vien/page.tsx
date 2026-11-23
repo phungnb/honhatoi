@@ -13,6 +13,7 @@ import { apiMessage } from "@/lib/errors";
 import { useLineages } from "@/lib/lineage";
 import { roleLabel } from "@/lib/roles";
 import DongHoTabs from "@/components/DongHoTabs";
+import DangTai from "@/components/DangTai";
 
 interface Member {
   userId: string;
@@ -97,7 +98,7 @@ export default function ThanhVienPage() {
         aria-label="Tìm thành viên theo tên"
       />
       {members === null ? (
-        <p className="muted-text section-gap">Đang tải…</p>
+        <DangTai />
       ) : shown.length === 0 ? (
         <p className="muted-text section-gap">Không có ai khớp “{q}”.</p>
       ) : (

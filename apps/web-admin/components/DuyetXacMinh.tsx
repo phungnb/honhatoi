@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { get, post } from "@/lib/api";
+import DangTai from "@/components/DangTai";
 
 type ProposalPayload = {
   before?: Record<string, unknown>;
@@ -123,9 +124,11 @@ function personName(p: Proposal): string {
 function diffRows(p: Proposal): { field: string; old: unknown; next: unknown }[] {
   const before = p.payload?.before ?? {};
   const after = p.payload?.after ?? {};
-  const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
-  return keys
-    .filter((k) => FIELD_LABEL[k] && before[k] !== after[k])
+  // Chỉ các trường có trong "after" mới được ghi khi duyệt; trường vắng mặt
+  // giữ nguyên, nên không được hiện như thể bị xóa thành "—".
+  const same = (a: unknown, b: unknown) => (a ?? null) === (b ?? null);
+  return Object.keys(after)
+    .filter((k) => FIELD_LABEL[k] && !same(before[k], after[k]))
     .map((k) => ({ field: FIELD_LABEL[k], old: before[k], next: after[k] }));
 }
 
@@ -329,7 +332,7 @@ export default function DuyetXacMinh({
       </div>
 
       {loading ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : proposals.length === 0 ? (
         <p className="muted-text">
           {lockedLineageId

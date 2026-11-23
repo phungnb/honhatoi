@@ -15,6 +15,8 @@ import { useLineages } from "@/lib/lineage";
 import { canManageLineage, isLineageAdmin, roleLabel } from "@/lib/roles";
 import BatDau from "@/components/BatDau";
 import GioiThieu from "@/components/GioiThieu";
+import BieuTuong from "@/components/BieuTuong";
+import DangTai from "@/components/DangTai";
 
 interface EventItem {
   id: string;
@@ -242,7 +244,7 @@ export default function TrangChu() {
 
   if (error === "unauthorized") return <GioiThieu inviteCode={inviteCode} />;
 
-  if (loading) return <p className="muted-text">Đang tải…</p>;
+  if (loading) return <DangTai />;
 
   if (error)
     return <p style={{ color: "var(--danger)" }}>{error}</p>;
@@ -317,18 +319,26 @@ export default function TrangChu() {
 
       <div className="chips section-gap" style={{ flexWrap: "wrap" }}>
         <Link className="chip" href="/app/gia-pha#vai-ve">
+          <BieuTuong ten="gia-pha" size={18} />
           Tra vai vế
         </Link>
         <Link className="chip" href="/app/lich-am">
+          <BieuTuong ten="lich" size={18} />
           Lịch âm dương
+        </Link>
+        <Link className="chip" href="/van-khan">
+          <BieuTuong ten="huong" size={18} />
+          Văn khấn
         </Link>
         {manages && current && (
           <Link className="chip" href={`/quan-ly/${current.id}`}>
+            <BieuTuong ten="dong-ho" size={18} />
             Quản lý dòng họ
           </Link>
         )}
         {admin && current && (
           <Link className="chip" href={`/quan-ly/${current.id}?tab=invites`}>
+            <BieuTuong ten="ca-nhan" size={18} />
             Mời người thân
           </Link>
         )}
@@ -336,7 +346,7 @@ export default function TrangChu() {
 
       <h2 className="sec-title">Hôm nay trong dòng họ</h2>
       {upcoming === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : upcoming.length === 0 ? (
         <div className="card">
           <p className="muted-text">
@@ -346,7 +356,7 @@ export default function TrangChu() {
         </div>
       ) : (
         upcoming.map((u, i) => (
-          <Link key={u.key} href={u.href} className={`card row ev-row${i === 0 && u.cls === "warm" ? " hot" : ""}`} style={{ marginBottom: 10, padding: 12 }}>
+          <Link key={u.key} href={u.href} className={`card row ev-row k-${u.cls}${i === 0 && u.cls === "warm" ? " hot" : ""}`} style={{ marginBottom: 10, padding: 12 }}>
             <div className="ev-date">
               <span className="d">{u.date.getDate()}</span>
               <span className="m">Th{u.date.getMonth() + 1}</span>
@@ -383,7 +393,7 @@ export default function TrangChu() {
         </Link>
       </div>
       {posts === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : posts.length === 0 ? (
         <div className="card">
           <p className="muted-text">

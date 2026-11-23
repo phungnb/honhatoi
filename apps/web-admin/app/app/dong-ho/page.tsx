@@ -15,6 +15,7 @@ import { useLineages } from "@/lib/lineage";
 import { isLineageAdmin } from "@/lib/roles";
 import DongHoTabs from "@/components/DongHoTabs";
 import BaoCao from "@/components/BaoCao";
+import DangTai from "@/components/DangTai";
 
 interface PostItem {
   id: string;
@@ -150,7 +151,7 @@ export default function BangTinPage() {
       </div>
 
       {posts === null ? (
-        <p className="muted-text section-gap">Đang tải…</p>
+        <DangTai />
       ) : posts.length === 0 ? (
         <div className="card section-gap">
           <p className="muted-text">
@@ -403,7 +404,7 @@ function BinhLuan({ base, onCount }: { base: string; onCount: (n: number) => voi
   return (
     <div className="binh-luan">
       {items === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : (
         items.map((c) => (
           <div key={c.id} className="binh-luan-item">

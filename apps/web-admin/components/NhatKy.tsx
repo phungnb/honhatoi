@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { get, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import DangTai from "@/components/DangTai";
 
 interface Log {
   id: string;
@@ -102,7 +103,7 @@ export default function NhatKy({ lineageId }: { lineageId: string }) {
       {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
       {info && <p style={{ color: "var(--brand)" }}>{info}</p>}
       {logs === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : logs.length === 0 ? (
         <p className="muted-text">Chưa có thao tác nào được ghi.</p>
       ) : (

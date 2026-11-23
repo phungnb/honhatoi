@@ -11,7 +11,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
 import DoiSoHo from "@/components/DoiSoHo";
+import DangTai from "@/components/DangTai";
 
+
+/** Nhãn tiếng Việt cho chế độ hiển thị dòng họ (giá trị lưu trong DB). */
+const CHE_DO: Record<string, string> = {
+  invite_only: "Chỉ người được mời",
+  private: "Riêng tư",
+  public: "Công khai",
+};
 interface AdminLineage {
   id: string;
   name: string;
@@ -93,7 +101,7 @@ export default function SuperAdminPage() {
       )}
 
       {loading ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : (
         !error && (
           <div className="table-wrap">
@@ -115,7 +123,7 @@ export default function SuperAdminPage() {
                         {l.name}
                       </Link>
                     </td>
-                    <td style={{ color: "var(--muted)" }}>{l.visibility}</td>
+                    <td style={{ color: "var(--muted)" }}>{CHE_DO[l.visibility] ?? l.visibility}</td>
                     <td>{l._count.memberships}</td>
                     <td>{l._count.persons}</td>
                     <td style={{ color: "var(--muted)" }}>

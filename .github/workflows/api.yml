@@ -1,6 +1,6 @@
 name: API
 
-# Kiểm tra backend mỗi PR (kiểm toán H7): biên dịch TypeScript và chạy bộ test
+# Kiểm tra backend mỗi PR (kiểm toán H7): biên dịch TypeScript, chạy bộ test
 # (lịch âm, danh xưng họ hàng, lịch sử sửa, ma trận quyền, chống truy cập chéo họ).
 on:
   push:
@@ -25,3 +25,34 @@ jobs:
       - run: npx prisma generate
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm test
+
+  # Phân quyền đầu-cuối trên Postgres thật: người ngoài họ, thành viên thường,
+  # chủ họ khác gọi thẳng API bằng ID của họ khác phải bị chặn; chặn vòng lặp
+  # huyết thống. Database dựng mới mỗi lần, không đụng dữ liệu thật.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hnt
+          POSTGRES_PASSWORD: hnt
+          POSTGRES_DB: hnt
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hnt"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://hnt:hnt@localhost:5432/hnt
+      JWT_SECRET: e2e-only-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --include=dev --no-audit --no-fund
+      - run: npx prisma generate
+      - run: npx prisma db push --skip-generate
+      - run: npm run test:e2e
