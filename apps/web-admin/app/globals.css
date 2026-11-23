@@ -35,6 +35,33 @@
   --hero-ring: rgba(163, 255, 18, 0.06);
   --row-line: rgba(48, 59, 77, 0.5);
   --brand-glow: 0 0 18px rgba(163, 255, 18, 0.35);
+  /* Thanh bên, thẻ đầu trang, bóng thẻ: giao diện tối giữ như cũ. */
+  --side-bg: var(--surface);
+  --side-text: var(--muted);
+  --side-strong: var(--text);
+  --side-muted: var(--muted-2);
+  --side-border: var(--border);
+  --side-hover: var(--surface-2);
+  --side-active-bg: var(--brand-soft);
+  --side-active-line: var(--brand-line);
+  --side-active-text: var(--brand);
+  --side-mark-bg: var(--brand);
+  --side-mark-text: var(--on-brand);
+  --hero-text: var(--text);
+  --hero-sub: var(--muted);
+  --hero-stat-bg: var(--surface);
+  --hero-stat-border: var(--border);
+  --hero-stat-n: var(--brand);
+  --hero-stat-l: var(--muted);
+  --hero-mark-bg: var(--brand-soft);
+  --hero-mark-line: var(--brand-line);
+  --hero-mark-text: var(--brand);
+  --hero-pattern: none;
+  --card-shadow: none;
+  --page-bg: var(--bg);
+  --chip-bg: var(--surface-2);
+  --chip-icon: var(--muted);
+  --color-scheme: dark;
   color-scheme: dark;
 }
 
@@ -71,6 +98,36 @@
     --hero-ring: rgba(47, 107, 79, 0.06);
     --row-line: rgba(120, 100, 70, 0.22);
     --brand-glow: 0 2px 8px rgba(23, 40, 59, 0.2);
+    /* Phong phú hơn (23/11): thanh bên xanh than + điểm vàng, thẻ đầu trang
+     * xanh rêu có hoa văn trống đồng, thẻ có bóng nhẹ, nút tắt có biểu tượng. */
+    --side-bg: #17283b;
+    --side-text: #c9d3df;
+    --side-strong: #ffffff;
+    --side-muted: #9fb0c3;
+    --side-border: rgba(255, 255, 255, 0.1);
+    --side-hover: rgba(255, 255, 255, 0.06);
+    --side-active-bg: rgba(214, 173, 98, 0.16);
+    --side-active-line: rgba(214, 173, 98, 0.45);
+    --side-active-text: #e9c47f;
+    --side-mark-bg: #d6ad62;
+    --side-mark-text: #17283b;
+    --hero-bg: linear-gradient(135deg, #1f4d3a 0%, #2f6b4f 100%);
+    --hero-border: #1f4d3a;
+    --hero-ring: rgba(214, 173, 98, 0.16);
+    --hero-text: #ffffff;
+    --hero-sub: #d7e6dc;
+    --hero-stat-bg: rgba(255, 255, 255, 0.1);
+    --hero-stat-border: rgba(255, 255, 255, 0.18);
+    --hero-stat-n: #f1d48f;
+    --hero-stat-l: #d7e6dc;
+    --hero-mark-bg: #d6ad62;
+    --hero-mark-line: #d6ad62;
+    --hero-mark-text: #17283b;
+    --hero-pattern: repeating-radial-gradient(circle at 100% 0%, transparent 0 18px, rgba(214, 173, 98, 0.1) 18px 19px, transparent 19px 30px);
+    --card-shadow: 0 1px 2px rgba(23, 40, 59, 0.05), 0 6px 18px rgba(23, 40, 59, 0.06);
+    --page-bg: radial-gradient(1200px 420px at 85% -10%, rgba(214, 173, 98, 0.16), transparent 70%), #f6f1e7;
+    --chip-bg: #fffdf8;
+    --chip-icon: #2f6b4f;
     color-scheme: light;
   }
 }
@@ -102,6 +159,36 @@
   --hero-ring: rgba(47, 107, 79, 0.06);
   --row-line: rgba(120, 100, 70, 0.22);
   --brand-glow: 0 2px 8px rgba(23, 40, 59, 0.2);
+  /* Phong phú hơn (23/11): thanh bên xanh than + điểm vàng, thẻ đầu trang
+   * xanh rêu có hoa văn trống đồng, thẻ có bóng nhẹ, nút tắt có biểu tượng. */
+  --side-bg: #17283b;
+  --side-text: #c9d3df;
+  --side-strong: #ffffff;
+  --side-muted: #9fb0c3;
+  --side-border: rgba(255, 255, 255, 0.1);
+  --side-hover: rgba(255, 255, 255, 0.06);
+  --side-active-bg: rgba(214, 173, 98, 0.16);
+  --side-active-line: rgba(214, 173, 98, 0.45);
+  --side-active-text: #e9c47f;
+  --side-mark-bg: #d6ad62;
+  --side-mark-text: #17283b;
+  --hero-bg: linear-gradient(135deg, #1f4d3a 0%, #2f6b4f 100%);
+  --hero-border: #1f4d3a;
+  --hero-ring: rgba(214, 173, 98, 0.16);
+  --hero-text: #ffffff;
+  --hero-sub: #d7e6dc;
+  --hero-stat-bg: rgba(255, 255, 255, 0.1);
+  --hero-stat-border: rgba(255, 255, 255, 0.18);
+  --hero-stat-n: #f1d48f;
+  --hero-stat-l: #d7e6dc;
+  --hero-mark-bg: #d6ad62;
+  --hero-mark-line: #d6ad62;
+  --hero-mark-text: #17283b;
+  --hero-pattern: repeating-radial-gradient(circle at 100% 0%, transparent 0 18px, rgba(214, 173, 98, 0.1) 18px 19px, transparent 19px 30px);
+  --card-shadow: 0 1px 2px rgba(23, 40, 59, 0.05), 0 6px 18px rgba(23, 40, 59, 0.06);
+  --page-bg: radial-gradient(1200px 420px at 85% -10%, rgba(214, 173, 98, 0.16), transparent 70%), #f6f1e7;
+  --chip-bg: #fffdf8;
+  --chip-icon: #2f6b4f;
   color-scheme: light;
 }
 
@@ -129,7 +216,8 @@ body {
 
 body {
   font-family: var(--font);
-  background: var(--bg);
+  background: var(--page-bg);
+  background-attachment: fixed;
   color: var(--text);
   font-size: 1rem; /* 16px: cỡ gốc tối thiểu cho người lớn tuổi (kiểm toán L4) */
   line-height: 1.55;
@@ -150,8 +238,8 @@ a {
 .sidebar {
   width: 264px;
   flex: none;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: var(--side-bg);
+  border-right: 1px solid var(--side-border);
   padding: 22px 14px;
   position: sticky;
   top: 0;
@@ -270,6 +358,7 @@ a {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 18px;
+  box-shadow: var(--card-shadow);
 }
 
 .card-title {
@@ -2268,3 +2357,136 @@ blockquote.trich-dan {
 .drag-handle:disabled { opacity: 0.3; cursor: default; }
 tr.row-dragging { background: var(--brand-soft); outline: 2px dashed var(--brand-line); outline-offset: -2px; }
 tr.row-dragging .drag-handle { color: var(--brand); }
+
+/* ===== Thanh bên theo token (giao diện sáng: xanh than + vàng) ===== */
+.sidebar .brand-mark {
+  background: var(--side-mark-bg);
+  color: var(--side-mark-text);
+}
+.sidebar .brand-name {
+  color: var(--side-strong);
+}
+.sidebar .brand-sub,
+.sidebar-foot {
+  color: var(--side-muted);
+}
+.sidebar-foot {
+  border-top-color: var(--side-border);
+}
+.sidebar-foot a {
+  color: var(--side-text);
+}
+.sidebar .nav-link {
+  color: var(--side-text);
+}
+.sidebar .nav-link:hover {
+  background: var(--side-hover);
+  color: var(--side-strong);
+}
+.sidebar .nav-link.active {
+  background: var(--side-active-bg);
+  border-color: var(--side-active-line);
+  color: var(--side-active-text);
+}
+.sidebar .nav-link.active .nav-dot {
+  box-shadow: 0 0 8px var(--side-active-text);
+}
+
+/* ===== Thẻ đầu trang: chữ và ô số theo token ===== */
+.card.hero-card {
+  color: var(--hero-text);
+  background-image: var(--hero-pattern), var(--hero-bg);
+}
+.card.hero-card .sub,
+.card.hero-card .muted-text {
+  color: var(--hero-sub);
+}
+.card.hero-card .hero-select {
+  color: var(--hero-text);
+}
+.card.hero-card .hero-select option {
+  color: var(--text);
+}
+.card.hero-card .hero-mark {
+  background: var(--hero-mark-bg);
+  border-color: var(--hero-mark-line);
+  color: var(--hero-mark-text);
+}
+.card.hero-card .stat2 {
+  background: var(--hero-stat-bg);
+  border-color: var(--hero-stat-border);
+}
+.card.hero-card .stat2 .n {
+  color: var(--hero-stat-n);
+}
+.card.hero-card .stat2 .l {
+  color: var(--hero-stat-l);
+}
+
+/* ===== Ô ngày kiểu lịch tờ: dải tháng màu theo loại việc ===== */
+.ev-date {
+  justify-content: flex-start;
+  overflow: hidden;
+  background: var(--surface);
+  gap: 2px;
+}
+.ev-date .m {
+  order: -1;
+  width: 100%;
+  text-align: center;
+  padding: 2px 0;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 0.6875rem;
+  letter-spacing: 0.5px;
+}
+.ev-date .d {
+  color: var(--text);
+  font-size: 1.375rem;
+  margin-top: 2px;
+}
+.ev-row.k-warm .ev-date .m {
+  background: var(--danger);
+  color: #fff;
+}
+.ev-row.k-blue .ev-date .m {
+  background: var(--info);
+  color: #fff;
+}
+.ev-row.k-warm,
+.ev-row.k-warm.hot {
+  border-left: 4px solid var(--danger);
+}
+.ev-row.k-warm.hot {
+  border-top-color: var(--danger-line);
+  border-right-color: var(--danger-line);
+  border-bottom-color: var(--danger-line);
+}
+.ev-row.k-blue {
+  border-left: 4px solid var(--info);
+}
+.ev-row.k-green {
+  border-left: 4px solid var(--brand);
+}
+
+/* ===== Nút tắt có biểu tượng ===== */
+.chips .chip {
+  background: var(--chip-bg);
+  box-shadow: 0 1px 2px rgba(23, 40, 59, 0.06);
+  color: var(--text);
+}
+.chip svg {
+  color: var(--chip-icon);
+}
+
+/* ===== Tiêu đề mục có dấu hoa văn ===== */
+.sec-title::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  vertical-align: 2px;
+  background: var(--warm);
+  transform: rotate(45deg);
+}

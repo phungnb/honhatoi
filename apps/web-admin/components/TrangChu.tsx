@@ -15,6 +15,7 @@ import { useLineages } from "@/lib/lineage";
 import { canManageLineage, isLineageAdmin, roleLabel } from "@/lib/roles";
 import BatDau from "@/components/BatDau";
 import GioiThieu from "@/components/GioiThieu";
+import BieuTuong from "@/components/BieuTuong";
 
 interface EventItem {
   id: string;
@@ -317,18 +318,22 @@ export default function TrangChu() {
 
       <div className="chips section-gap" style={{ flexWrap: "wrap" }}>
         <Link className="chip" href="/app/gia-pha#vai-ve">
+          <BieuTuong ten="gia-pha" size={18} />
           Tra vai vế
         </Link>
         <Link className="chip" href="/app/lich-am">
+          <BieuTuong ten="lich" size={18} />
           Lịch âm dương
         </Link>
         {manages && current && (
           <Link className="chip" href={`/quan-ly/${current.id}`}>
+            <BieuTuong ten="dong-ho" size={18} />
             Quản lý dòng họ
           </Link>
         )}
         {admin && current && (
           <Link className="chip" href={`/quan-ly/${current.id}?tab=invites`}>
+            <BieuTuong ten="ca-nhan" size={18} />
             Mời người thân
           </Link>
         )}
@@ -346,7 +351,7 @@ export default function TrangChu() {
         </div>
       ) : (
         upcoming.map((u, i) => (
-          <Link key={u.key} href={u.href} className={`card row ev-row${i === 0 && u.cls === "warm" ? " hot" : ""}`} style={{ marginBottom: 10, padding: 12 }}>
+          <Link key={u.key} href={u.href} className={`card row ev-row k-${u.cls}${i === 0 && u.cls === "warm" ? " hot" : ""}`} style={{ marginBottom: 10, padding: 12 }}>
             <div className="ev-date">
               <span className="d">{u.date.getDate()}</span>
               <span className="m">Th{u.date.getMonth() + 1}</span>
