@@ -28,6 +28,7 @@ import { foldVietnamese } from '../common/text';
 import { diffFields, staleFields } from './history';
 import { StorageService, sniffImage } from '../storage/storage.service';
 import { randomUUID } from 'crypto';
+import { createsCycle, toParentEdge } from './lineage-graph';
 
 /**
  * GenealogyService — triển khai đầy đủ module Gia phả.
@@ -89,6 +90,40 @@ export class GenealogyService {
   ) {}
 
   // ---------------------------------------------------------------- helpers
+
+  /**
+   * Chặn quan hệ cha mẹ/con làm một người thành tổ tiên của chính mình.
+   * Chạy cả khi thêm trực tiếp, khi gửi đề xuất và khi duyệt đề xuất.
+   */
+  private async assertNoCycle(
+    db: Prisma.TransactionClient,
+    lineageId: string,
+    personId: string,
+    relatedPersonId: string,
+    relationshipType: string,
+  ) {
+    const edge = toParentEdge(personId, relatedPersonId, relationshipType);
+    if (!edge) return;
+    const rows = await db.familyRelationship.findMany({
+      where: {
+        lineageId,
+        relationshipType: { in: PARENT_TYPES },
+        person: { deletedAt: null },
+        relatedPerson: { deletedAt: null },
+      },
+      select: { personId: true, relatedPersonId: true },
+    });
+    const existing = rows.map((r) => ({
+      parentId: r.personId,
+      childId: r.relatedPersonId,
+    }));
+    if (createsCycle(existing, edge))
+      throw new BadRequestException({
+        code: 'RELATIONSHIP_CYCLE',
+        message:
+          'Quan hệ này khiến một người thành tổ tiên của chính mình. Vui lòng kiểm tra lại đời và cha mẹ.',
+      });
+  }
 
   /** Lấy hồ sơ person chưa xóa mềm, không thấy → 404. */
   private async getPersonOrThrow(personId: string) {
@@ -848,6 +883,14 @@ export class GenealogyService {
         message: 'Không thể tạo quan hệ giữa hai dòng họ khác nhau',
       });
 
+    await this.assertNoCycle(
+      this.prisma,
+      lineageId,
+      dto.personId,
+      dto.relatedPersonId,
+      dto.relationshipType,
+    );
+
     const existing = await this.prisma.familyRelationship.findFirst({
       where: {
         lineageId,
@@ -1201,6 +1244,13 @@ export class GenealogyService {
               code: 'PERSON_NOT_FOUND',
               message: 'Một trong hai hồ sơ không còn tồn tại',
             });
+          await this.assertNoCycle(
+            tx,
+            proposal.lineageId,
+            personId,
+            relatedPersonId,
+            relationshipType,
+          );
           const mk = (p1: string, p2: string, t: string) =>
             tx.familyRelationship.upsert({
               where: {

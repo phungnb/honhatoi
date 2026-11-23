@@ -24,8 +24,8 @@ export default function QuyenRiengTuPage() {
       <h2>2. Dữ liệu chúng tôi thu thập</h2>
       <ul>
         <li>
-          <strong>Tài khoản:</strong> họ tên hiển thị, số điện thoại, email, mật khẩu (chỉ lưu dạng
-          mã hóa một chiều), mã định danh Google nếu bạn đăng nhập bằng Google.
+          <strong>Tài khoản:</strong> họ tên hiển thị, số điện thoại, email, mật khẩu (không lưu mật khẩu
+          gốc, chỉ lưu bản băm argon2), mã định danh Google nếu bạn đăng nhập bằng Google.
         </li>
         <li>
           <strong>Gia phả:</strong> thông tin về người trong dòng họ do thành viên nhập: họ tên, giới
@@ -99,7 +99,7 @@ export default function QuyenRiengTuPage() {
         </li>
         <li>Đăng nhập bằng Google do Google xử lý theo chính sách của Google.</li>
         <li>
-          Kết nối luôn được mã hóa (HTTPS); mật khẩu chỉ lưu dạng mã hóa một chiều; chỉ người vận
+          Kết nối luôn được mã hóa (HTTPS); mật khẩu được băm bằng argon2 (có salt riêng cho từng mật khẩu), không ai đọc lại được mật khẩu gốc; chỉ người vận
           hành được truy cập cơ sở dữ liệu.
         </li>
         <li>

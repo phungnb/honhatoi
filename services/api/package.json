@@ -46,7 +46,8 @@
     "start:debug": "nest start --debug --watch",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "test": "TS_NODE_TRANSPILE_ONLY=1 node --require ts-node/register --test test/*.test.ts"
+    "test": "TS_NODE_TRANSPILE_ONLY=1 node --require ts-node/register --test test/*.test.ts",
+    "test:e2e": "TS_NODE_TRANSPILE_ONLY=1 node --require ts-node/register --test test/e2e/*.e2e.ts"
   },
   "version": "1.0.0",
   "engines": {
