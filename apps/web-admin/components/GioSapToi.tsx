@@ -30,18 +30,21 @@ export default function GioSapToi({
   limit?: number;
 }) {
   const [items, setItems] = useState<Anniversary[] | null>(null);
+  // Mặc định hiện vài người gần nhất; "Xem cả năm" hiện đủ mọi ngày giỗ trong 12 tháng tới.
+  const [ca, setCa] = useState(false);
+  const soLay = ca ? 200 : limit;
 
   useEffect(() => {
     if (!demo && !lineageId) return;
     setItems(null);
     get<{ data?: { anniversaries?: Anniversary[] } }>(
       demo
-        ? `/demo/anniversaries?limit=${limit}&days=365`
-        : `/genealogy/lineages/${lineageId}/anniversaries?limit=${limit}&days=365`,
+        ? `/demo/anniversaries?limit=${soLay}&days=365`
+        : `/genealogy/lineages/${lineageId}/anniversaries?limit=${soLay}&days=365`,
     )
       .then((b) => setItems(b?.data?.anniversaries ?? []))
       .catch(() => setItems([]));
-  }, [lineageId, demo, limit]);
+  }, [lineageId, demo, soLay]);
 
   return (
     <div className="card section-gap">
@@ -74,6 +77,11 @@ export default function GioSapToi({
               </span>
             </div>
           ))}
+          {!ca && items.length >= limit && (
+            <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => setCa(true)}>
+              Xem đủ ngày giỗ cả năm
+            </button>
+          )}
         </div>
       )}
     </div>
