@@ -325,6 +325,10 @@ export default function TrangChu() {
           <BieuTuong ten="lich" size={18} />
           Lịch âm dương
         </Link>
+        <Link className="chip" href="/van-khan">
+          <BieuTuong ten="huong" size={18} />
+          Văn khấn
+        </Link>
         {manages && current && (
           <Link className="chip" href={`/quan-ly/${current.id}`}>
             <BieuTuong ten="dong-ho" size={18} />

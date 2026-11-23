@@ -6,6 +6,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
 
+/** Bài khấn gia tiên ngày giỗ thường (xem lib/van-khan.ts). */
+const BAI_GIO = "/van-khan/gio-thuong-ban-ngan-dung-cho-gio-ong-ba-gio-cu";
+
 interface Anniversary {
   personId: string;
   fullName: string;
@@ -71,6 +74,15 @@ export default function GioSapToi({
                 <span className="sub" style={{ display: "block" }}>
                   Giỗ ngày {a.gioLabel ?? `${a.deathLunar} âm lịch`} · {fmtSolar(a.nextSolar)}
                 </span>
+                <Link
+                  className="lien-khan"
+                  href={`${BAI_GIO}?${new URLSearchParams({
+                    ten: a.fullName,
+                    ngay: a.gioLabel ?? `${a.deathLunar} âm lịch`,
+                  })}`}
+                >
+                  Xem văn khấn ngày giỗ
+                </Link>
               </span>
               <span className={`badge ${a.daysUntil <= 7 ? "warm" : ""}`}>
                 {a.daysUntil === 0 ? "Hôm nay" : `Còn ${a.daysUntil} ngày`}

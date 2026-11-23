@@ -56,6 +56,13 @@ const PATHS: Record<string, React.ReactNode> = {
       <path d="M21 21l-4.3-4.3" />
     </>
   ),
+  // Ba nén hương trên bát hương: mục Văn khấn.
+  huong: (
+    <>
+      <path d="M8 3v8M12 2v9M16 3v8" />
+      <path d="M4 13h16l-1.5 6.5a2 2 0 01-2 1.5h-9a2 2 0 01-2-1.5z" />
+    </>
+  ),
   gui: <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />,
   "dang-nhap": (
     <>

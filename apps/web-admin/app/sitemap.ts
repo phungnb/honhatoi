@@ -1,8 +1,10 @@
 import type { MetadataRoute } from "next";
+import { BAI } from "@/lib/van-khan";
 
 const GOC = process.env.NEXT_PUBLIC_SITE_URL ?? "https://honhatoi.vercel.app";
 
 /** Các trang công khai, không cần đăng nhập. */
 export default function sitemap(): MetadataRoute.Sitemap {
-  return ["/app", "/mau", "/dieu-khoan", "/quyen-rieng-tu"].map((p) => ({ url: `${GOC}${p}` }));
+  const trang = ["/app", "/mau", "/van-khan", "/dieu-khoan", "/quyen-rieng-tu"];
+  return [...trang, ...BAI.map((b) => `/van-khan/${b.slug}`)].map((p) => ({ url: `${GOC}${p}` }));
 }
