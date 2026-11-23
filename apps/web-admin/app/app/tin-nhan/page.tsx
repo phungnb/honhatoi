@@ -17,6 +17,7 @@ import { useLineages } from "@/lib/lineage";
 import { isLineageAdmin } from "@/lib/roles";
 import BaoCao from "@/components/BaoCao";
 import BieuTuong from "@/components/BieuTuong";
+import DangTai from "@/components/DangTai";
 
 interface Reaction {
   emoji: string;
@@ -311,7 +312,7 @@ export default function TinNhanPage() {
               <span className="pill green">Chung</span>
             </button>
           )}
-          {convs === null && <p className="muted-text">Đang tải…</p>}
+          {convs === null && <DangTai />}
           {convs !== null && groupRooms.length === 0 && !(current && !hasCurrentGroup) && (
             <p className="muted-text" style={{ padding: "12px 0" }}>Không có phòng nào khớp.</p>
           )}

@@ -82,7 +82,7 @@ export default function BaiKhanPage({ params }: { params: { slug: string } }) {
 
       {/* Đọc ?ten=&ngay= từ trang Giỗ sắp tới để nhắc người khấn điền đúng. */}
       <Suspense fallback={null}>
-        <CongCuKhan vanBan={vanBanThuan(b)} />
+        <CongCuKhan vanBan={vanBanThuan(b)} slug={b.slug} />
       </Suspense>
 
       <article className="bai-khan card">
@@ -93,7 +93,7 @@ export default function BaiKhanPage({ params }: { params: { slug: string } }) {
 
       {b.notes.map((n, k) => (
         <p key={k} className="muted-text section-gap">
-          Ghi chú: {dong(n)}
+          Ghi chú: {dong(n.replace(/^Ghi chú:\s*/i, ""))}
         </p>
       ))}
 

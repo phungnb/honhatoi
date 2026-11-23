@@ -16,6 +16,7 @@ import { canManageLineage, isLineageAdmin, roleLabel } from "@/lib/roles";
 import BatDau from "@/components/BatDau";
 import GioiThieu from "@/components/GioiThieu";
 import BieuTuong from "@/components/BieuTuong";
+import DangTai from "@/components/DangTai";
 
 interface EventItem {
   id: string;
@@ -243,7 +244,7 @@ export default function TrangChu() {
 
   if (error === "unauthorized") return <GioiThieu inviteCode={inviteCode} />;
 
-  if (loading) return <p className="muted-text">Đang tải…</p>;
+  if (loading) return <DangTai />;
 
   if (error)
     return <p style={{ color: "var(--danger)" }}>{error}</p>;
@@ -345,7 +346,7 @@ export default function TrangChu() {
 
       <h2 className="sec-title">Hôm nay trong dòng họ</h2>
       {upcoming === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : upcoming.length === 0 ? (
         <div className="card">
           <p className="muted-text">
@@ -392,7 +393,7 @@ export default function TrangChu() {
         </Link>
       </div>
       {posts === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : posts.length === 0 ? (
         <div className="card">
           <p className="muted-text">

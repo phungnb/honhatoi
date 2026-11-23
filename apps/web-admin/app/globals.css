@@ -334,6 +334,14 @@ a {
   padding: 28px 32px 48px;
   max-width: 1200px;
 }
+/* Màn hình rộng (1600 px trở lên): nới vùng nội dung và canh giữa phần còn
+   lại bên phải thanh bên, không để trống một mảng lớn bên phải. */
+@media (min-width: 1600px) {
+  .main {
+    max-width: 1440px;
+    margin-inline: auto;
+  }
+}
 
 /* ===== Tiêu đề trang ===== */
 .page-head {
@@ -2615,10 +2623,84 @@ tr.row-dragging .drag-handle { color: var(--brand); }
   .khong-in {
     display: none !important;
   }
+  body,
+  .main {
+    background: #fff !important;
+  }
   .bai-khan {
     border: none;
     box-shadow: none;
     color: #000;
     background: #fff;
+  }
+}
+
+/* Chú giải màu dưới cây gia phả (components/SoDoCay.tsx) */
+.sd-chu-giai {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+.sd-chu-giai li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sd-chu-giai .mau {
+  width: 26px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(110, 82, 56, 0.55);
+  border-top: 4px solid #9b1c1c;
+  background: #fffbf2;
+  flex: none;
+}
+.sd-chu-giai .mau.nu {
+  border-top-color: #a87414;
+}
+.sd-chu-giai .mau.mat {
+  border-top-color: #9b1c1c;
+  background: conic-gradient(from 210deg, #5e5040, #a8957a, #6f604c, #b9a78b, #5e5040);
+}
+.sd-chu-giai .mau.dau {
+  border-style: dashed;
+  border-top-style: solid;
+}
+.sd-chu-giai .mau.ngoai {
+  border-style: dashed;
+  border-color: #8a6a45;
+  border-top-style: solid;
+  background: #f6ecd6;
+}
+
+/* Khung chờ khi đang tải (components/DangTai.tsx): thay chữ "Đang tải…". */
+.dang-tai {
+  display: grid;
+  gap: 10px;
+}
+.dang-tai .vach {
+  height: 56px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--surface) 0%, var(--border) 50%, var(--surface) 100%);
+  background-size: 200% 100%;
+  animation: dang-tai 1.2s ease-in-out infinite;
+}
+.dang-tai .vach.ngan {
+  height: 22px;
+  width: 40%;
+}
+@keyframes dang-tai {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dang-tai .vach {
+    animation: none;
   }
 }

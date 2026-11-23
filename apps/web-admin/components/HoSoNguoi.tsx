@@ -15,6 +15,7 @@ import { apiMessage } from "@/lib/errors";
 import { nenChanDung } from "@/lib/anh";
 import { daMat } from "@/components/CayNhanh";
 import { anhUrl } from "@/components/SoDoCay";
+import DangTai from "@/components/DangTai";
 
 interface Person {
   id: string;
@@ -177,7 +178,7 @@ export default function HoSoNguoi({
         onClick={(e) => e.stopPropagation()}
       >
         {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-        {!p && !error && <p className="muted-text">Đang tải…</p>}
+        {!p && !error && <DangTai dong={2} />}
         {p && (
           <>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>

@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { get, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import DangTai from "@/components/DangTai";
 
 interface Report {
   id: string;
@@ -81,7 +82,7 @@ export default function BaoCaoViPham({ lineageId }: { lineageId: string }) {
       </div>
       {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
       {items === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : items.length === 0 ? (
         <p className="muted-text section-gap">
           {view === "pending" ? "Không có báo cáo nào đang chờ." : "Chưa có báo cáo nào được xử lý."}

@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { get, post } from "@/lib/api";
+import DangTai from "@/components/DangTai";
 
 type ProposalPayload = {
   before?: Record<string, unknown>;
@@ -331,7 +332,7 @@ export default function DuyetXacMinh({
       </div>
 
       {loading ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : proposals.length === 0 ? (
         <p className="muted-text">
           {lockedLineageId

@@ -23,6 +23,7 @@ import BaoCaoViPham from "@/components/BaoCaoViPham";
 import XacNhanLienKet from "@/components/XacNhanLienKet";
 import NhatKy from "@/components/NhatKy";
 import SuaGiaPha from "@/components/SuaGiaPha";
+import DangTai from "@/components/DangTai";
 
 type Tab = "tree" | "proposals" | "requests" | "members" | "invites" | "reports" | "log";
 
@@ -153,7 +154,7 @@ export default function QuanLyHo({ lineageId }: { lineageId: string }) {
     })();
   }, [lineageId]);
 
-  if (state === "loading") return <p className="muted-text">Đang tải…</p>;
+  if (state === "loading") return <DangTai />;
   if (state === "unauthorized")
     return (
       <>
@@ -278,7 +279,7 @@ function JoinRequests({
     }
   }
 
-  if (loading) return <p className="muted-text">Đang tải…</p>;
+  if (loading) return <DangTai />;
   return (
     <>
       {msg && <p className="muted-text">{msg}</p>}
@@ -393,7 +394,7 @@ function Members({
     return admin && m.role !== "ADMIN";
   }
 
-  if (loading) return <p className="muted-text">Đang tải…</p>;
+  if (loading) return <DangTai />;
   return (
     <>
       {msg && <p className="muted-text">{msg}</p>}

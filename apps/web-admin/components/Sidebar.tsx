@@ -142,7 +142,7 @@ export default function Sidebar() {
           Một tài khoản cho mọi vai trò: Thành viên, Người giữ gia phả, Ban
           quản trị, Chủ gia phả.
           <div style={{ marginTop: 8 }}>
-            <Link href="/dieu-khoan">Điều khoản</Link> · <Link href="/quyen-rieng-tu">Quyền riêng tư</Link>
+            <Link href="/dieu-khoan">Điều khoản</Link> · <Link href="/quyen-rieng-tu">Quyền riêng tư</Link> · <Link href="/lien-he">Liên hệ</Link>
           </div>
         </div>
       </aside>

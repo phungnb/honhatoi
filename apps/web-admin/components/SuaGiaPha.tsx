@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import { del, get, patch, post, put } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import DangTai from "@/components/DangTai";
 
 interface Person {
   id: string;
@@ -672,7 +673,7 @@ export default function SuaGiaPha({ lineageId }: { lineageId: string }) {
       <div className="card section-gap">
         <h2 className="card-title">Trong cây ({persons.length} người)</h2>
         {loading ? (
-          <p className="muted-text">Đang tải…</p>
+          <DangTai />
         ) : persons.length === 0 ? (
           <p className="muted-text">Chưa có ai.</p>
         ) : (

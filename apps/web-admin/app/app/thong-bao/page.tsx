@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { get, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
+import DangTai from "@/components/DangTai";
 
 interface Item {
   id: string;
@@ -100,7 +101,7 @@ export default function ThongBaoPage() {
       )}
       {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
       {items === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : items.length === 0 ? (
         <p className="muted-text">Chưa có thông báo nào.</p>
       ) : (

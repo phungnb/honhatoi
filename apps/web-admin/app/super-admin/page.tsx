@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
 import DoiSoHo from "@/components/DoiSoHo";
+import DangTai from "@/components/DangTai";
 
 
 /** Nhãn tiếng Việt cho chế độ hiển thị dòng họ (giá trị lưu trong DB). */
@@ -100,7 +101,7 @@ export default function SuperAdminPage() {
       )}
 
       {loading ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : (
         !error && (
           <div className="table-wrap">

@@ -19,6 +19,7 @@ import HoSoNguoi from "@/components/HoSoNguoi";
 import GioSapToi from "@/components/GioSapToi";
 import CayNhanh, { CayRelationship, daMat } from "@/components/CayNhanh";
 import SoDoCay from "@/components/SoDoCay";
+import DangTai from "@/components/DangTai";
 
 interface TreePerson {
   id: string;
@@ -369,7 +370,7 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
       </label>
 
       {loading ? (
-        <p className="muted-text section-gap">Đang tải…</p>
+        <DangTai />
       ) : persons.length === 0 ? (
         <p className="muted-text section-gap">
           Cây gia phả còn trống.

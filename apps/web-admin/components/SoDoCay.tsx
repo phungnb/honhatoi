@@ -211,18 +211,25 @@ export default function SoDoCay({
     setT({ s, x: (r.width - layout.width * s) / 2, y: Math.max(0, (r.height - layout.height * s) / 2) });
   }, [layout.width, layout.height]);
 
-  // Lần đầu: giữ cỡ chữ đọc được, đặt đôi tổ tiên ở giữa phía trên khung nhìn.
-  const firstFit = useRef(false);
-  useLayoutEffect(() => {
-    if (firstFit.current || !viewRef.current || !layout.nodes.length) return;
-    firstFit.current = true;
-    const r = viewRef.current.getBoundingClientRect();
+  // Lần đầu (và nút "Về đầu cây"): giữ cỡ chữ đọc được, đặt đôi tổ tiên ở
+  // giữa phía trên khung nhìn. Cây rộng hơn khung thì canh theo tổ tiên chứ
+  // không canh trái, để không bị cắt mất nửa cây bên phải.
+  const veDau = useCallback(() => {
+    const el = viewRef.current;
+    if (!el || !layout.nodes.length) return;
+    const r = el.getBoundingClientRect();
     const s = Math.min(1, Math.max(0.6, r.width / layout.width));
     const top = layout.nodes[0];
     const cx = (PAD + top.x + unitW(top) / 2) * s;
     const x = layout.width * s <= r.width ? (r.width - layout.width * s) / 2 : r.width / 2 - cx;
     setT({ s, x, y: 8 });
   }, [layout]);
+  const firstFit = useRef(false);
+  useLayoutEffect(() => {
+    if (firstFit.current || !viewRef.current || !layout.nodes.length) return;
+    firstFit.current = true;
+    veDau();
+  }, [layout, veDau]);
 
   const zoomAt = useCallback((factor: number, cx: number, cy: number) => {
     setT((p) => {
@@ -475,6 +482,9 @@ export default function SoDoCay({
                 {ngoaiOpen ? "Gập nhánh ngoại" : "Mở nhánh ngoại"}
               </button>
             )}
+            <button className="btn" onClick={veDau}>
+              Về đầu cây
+            </button>
             <button className="btn" onClick={fit}>
               Xem toàn bộ
             </button>
@@ -482,9 +492,15 @@ export default function SoDoCay({
         </div>
         <div className="ct-truc" aria-hidden />
       </div>
+      <ul className="sd-chu-giai" aria-label="Chú giải màu">
+        <li><span className="mau nam" />Nam</li>
+        <li><span className="mau nu" />Nữ</li>
+        <li><span className="mau mat" />Đã mất (ảnh ngả nâu)</li>
+        <li><span className="mau dau" />Dâu, rể (viền đứt)</li>
+        <li><span className="mau ngoai" />Nhánh ngoại (con của con gái trong họ)</li>
+      </ul>
       <p className="muted-text sd-hint">
-        Kéo để di chuyển; phóng to/thu nhỏ bằng nút + −, chụm hai ngón, hoặc giữ Ctrl và lăn chuột. Bấm vào tên để xem hồ sơ. Khung viền
-        đứt nét màu nâu là con cháu nhánh ngoại (con của con gái trong họ).
+        Kéo để di chuyển; phóng to/thu nhỏ bằng nút + −, chụm hai ngón, hoặc giữ Ctrl và lăn chuột. Bấm vào tên để xem hồ sơ.
       </p>
     </div>
   );

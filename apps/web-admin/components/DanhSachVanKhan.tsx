@@ -2,10 +2,11 @@
 
 /** Danh sách văn khấn: tìm không cần gõ dấu, lọc theo nhóm. */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { boDau } from "@/lib/chu";
 import BieuTuong from "@/components/BieuTuong";
+import { docDaLuu } from "@/components/CongCuKhan";
 
 type Muc = { slug: string; title: string; group: number };
 type Nhom = { id: number; name: string };
@@ -13,6 +14,9 @@ type Nhom = { id: number; name: string };
 export default function DanhSachVanKhan({ nhom, bai }: { nhom: Nhom[]; bai: Muc[] }) {
   const [q, setQ] = useState("");
   const [chon, setChon] = useState<number | null>(null);
+  const [daLuu, setDaLuu] = useState<string[]>([]);
+  useEffect(() => setDaLuu(docDaLuu()), []);
+  const baiDaLuu = daLuu.map((s) => bai.find((b) => b.slug === s)).filter((b): b is Muc => !!b);
 
   const khop = useMemo(() => {
     const k = boDau(q);
@@ -46,6 +50,19 @@ export default function DanhSachVanKhan({ nhom, bai }: { nhom: Nhom[]; bai: Muc[
           </button>
         ))}
       </div>
+      {!q && chon === null && baiDaLuu.length > 0 && (
+        <section className="section-gap">
+          <h2 className="sec-title">Bài của tôi</h2>
+          <div className="list">
+            {baiDaLuu.map((b) => (
+              <Link key={b.slug} href={`/van-khan/${b.slug}`} className="list-item">
+                <span className="grow">{b.title}</span>
+                <span className="sub" aria-hidden="true">›</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       {q && (
         <p className="muted-text" role="status">
           {khop.length ? `Tìm thấy ${khop.length} bài.` : `Không có bài nào khớp “${q}”.`}

@@ -14,6 +14,7 @@ import { apiMessage } from "@/lib/errors";
 import { useLineages } from "@/lib/lineage";
 import DongHoTabs from "@/components/DongHoTabs";
 import HoSoNguoi from "@/components/HoSoNguoi";
+import DangTai from "@/components/DangTai";
 
 interface Entry {
   id: string;
@@ -195,7 +196,7 @@ export default function LichSuPage() {
           {msg}
         </p>
       )}
-      {!data && !err && <p className="muted-text section-gap">Đang tải…</p>}
+      {!data && !err && <DangTai />}
 
       {data && (
         <>

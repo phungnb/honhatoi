@@ -12,6 +12,7 @@ import { get, getAccessToken, post } from "@/lib/api";
 import { apiMessage } from "@/lib/errors";
 import { useLineages } from "@/lib/lineage";
 import DongHoTabs from "@/components/DongHoTabs";
+import DangTai from "@/components/DangTai";
 
 interface EventItem {
   id: string;
@@ -214,7 +215,7 @@ export default function SuKienPage() {
 
       <div className="list section-gap">
         {events === null ? (
-          <p className="muted-text">Đang tải…</p>
+          <DangTai />
         ) : events.length === 0 ? (
           <p className="muted-text">{past ? "Chưa có sự kiện nào đã qua." : "Chưa có sự kiện nào sắp tới."}</p>
         ) : (
@@ -316,7 +317,7 @@ function ChiTiet({
     <div className="sheet-backdrop" onClick={() => onClose(changed)}>
       <div className="sheet" role="dialog" aria-modal="true" onClick={(ev) => ev.stopPropagation()}>
         {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
-        {!e && !err && <p className="muted-text">Đang tải…</p>}
+        {!e && !err && <DangTai />}
         {e && d && (
           <>
             <span className={`badge${e.status === "cancelled" ? " danger" : " brand"}`}>

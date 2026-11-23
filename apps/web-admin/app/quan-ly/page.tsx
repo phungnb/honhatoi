@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { get } from "@/lib/api";
 import { MyLineage, canManageLineage, roleLabel } from "@/lib/roles";
 import BatDau from "@/components/BatDau";
+import DangTai from "@/components/DangTai";
 
 export default function QuanLyPage() {
   const router = useRouter();
@@ -49,7 +50,7 @@ export default function QuanLyPage() {
           Duyệt đề xuất gia phả, duyệt người vào họ, phân vai trò và tạo mã mời.
         </p>
       </div>
-      {state === "loading" && <p className="muted-text">Đang tải…</p>}
+      {state === "loading" && <DangTai />}
       {state === "unauthorized" && (
         <Link className="btn primary" href="/dang-nhap">
           Đăng nhập

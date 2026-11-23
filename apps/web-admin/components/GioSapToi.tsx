@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { get } from "@/lib/api";
+import DangTai from "@/components/DangTai";
 
 /** Bài khấn gia tiên ngày giỗ thường (xem lib/van-khan.ts). */
 const BAI_GIO = "/van-khan/gio-thuong-ban-ngan-dung-cho-gio-ong-ba-gio-cu";
@@ -60,7 +61,7 @@ export default function GioSapToi({
         )}
       </h2>
       {items === null ? (
-        <p className="muted-text">Đang tải…</p>
+        <DangTai />
       ) : items.length === 0 ? (
         <p className="muted-text">
           Chưa có ngày giỗ nào. Ngày giỗ tự có khi gia phả ghi ngày mất.
