@@ -27,6 +27,82 @@
   --font: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
   /* Chữ có chân cho cây gia phả: dấu tiếng Việt chồng (Ễ, Ỗ, Ậ) rõ, không dính. */
   --font-serif: "Noto Serif", "Times New Roman", Georgia, serif;
+  /* Màu nền các thanh, thẻ nổi bật: đổi theo giao diện sáng/tối. */
+  --nav-bg: rgba(13, 17, 24, 0.96);
+  --topbar-bg: linear-gradient(180deg, rgba(11, 15, 20, 0.98), rgba(11, 15, 20, 0.88));
+  --hero-bg: linear-gradient(135deg, #161e2c, #1c2432);
+  --hero-border: #36435a;
+  --hero-ring: rgba(163, 255, 18, 0.06);
+  --row-line: rgba(48, 59, 77, 0.5);
+  --brand-glow: 0 0 18px rgba(163, 255, 18, 0.35);
+  color-scheme: dark;
+}
+
+/* ===== Giao diện sáng (Phụng chốt 23/11/2026) =====
+ * Nền ngà ấm, chữ xanh than đậm, điểm nhấn xanh rêu thay neon (neon không
+ * đọc được trên nền sáng). Áp khi máy để chế độ sáng, hoặc người dùng chọn
+ * "Sáng" ở trang Cá nhân. Mọi cặp chữ/nền đạt tương phản WCAG AA (≥ 4,5:1). */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f6f1e7;
+    --surface: #fffdf8;
+    --surface-2: #efe7d6;
+    --border: #d6cbb5;
+    --text: #17283b;
+    --muted: #3f4a59;
+    --muted-2: #5b6472;
+    --brand: #2f6b4f;
+    --on-brand: #ffffff;
+    --brand-soft: rgba(47, 107, 79, 0.1);
+    --brand-line: rgba(47, 107, 79, 0.35);
+    --warm: #8a5a12;
+    --warm-soft: rgba(166, 116, 30, 0.12);
+    --warm-line: rgba(166, 116, 30, 0.4);
+    --danger: #b42335;
+    --danger-soft: rgba(180, 35, 53, 0.08);
+    --danger-line: rgba(180, 35, 53, 0.35);
+    --info: #2f55b5;
+    --info-soft: rgba(47, 85, 181, 0.08);
+    --info-line: rgba(47, 85, 181, 0.3);
+    --nav-bg: rgba(255, 253, 248, 0.97);
+    --topbar-bg: linear-gradient(180deg, rgba(246, 241, 231, 0.98), rgba(246, 241, 231, 0.9));
+    --hero-bg: linear-gradient(135deg, #fffdf8, #f3ead6);
+    --hero-border: #d6c49c;
+    --hero-ring: rgba(47, 107, 79, 0.06);
+    --row-line: rgba(120, 100, 70, 0.22);
+    --brand-glow: 0 2px 8px rgba(23, 40, 59, 0.2);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f6f1e7;
+  --surface: #fffdf8;
+  --surface-2: #efe7d6;
+  --border: #d6cbb5;
+  --text: #17283b;
+  --muted: #3f4a59;
+  --muted-2: #5b6472;
+  --brand: #2f6b4f;
+  --on-brand: #ffffff;
+  --brand-soft: rgba(47, 107, 79, 0.1);
+  --brand-line: rgba(47, 107, 79, 0.35);
+  --warm: #8a5a12;
+  --warm-soft: rgba(166, 116, 30, 0.12);
+  --warm-line: rgba(166, 116, 30, 0.4);
+  --danger: #b42335;
+  --danger-soft: rgba(180, 35, 53, 0.08);
+  --danger-line: rgba(180, 35, 53, 0.35);
+  --info: #2f55b5;
+  --info-soft: rgba(47, 85, 181, 0.08);
+  --info-line: rgba(47, 85, 181, 0.3);
+  --nav-bg: rgba(255, 253, 248, 0.97);
+  --topbar-bg: linear-gradient(180deg, rgba(246, 241, 231, 0.98), rgba(246, 241, 231, 0.9));
+  --hero-bg: linear-gradient(135deg, #fffdf8, #f3ead6);
+  --hero-border: #d6c49c;
+  --hero-ring: rgba(47, 107, 79, 0.06);
+  --row-line: rgba(120, 100, 70, 0.22);
+  --brand-glow: 0 2px 8px rgba(23, 40, 59, 0.2);
+  color-scheme: light;
 }
 
 /* Cỡ chữ người dùng chọn ở trang Cá nhân; mọi cỡ chữ tính theo rem. */
@@ -1512,13 +1588,13 @@ blockquote.trich-dan {
 /* Thanh tab dưới: biểu tượng + nhãn + chấm sáng khi đang chọn */
 @media (max-width: 900px) {
   .bottom-nav {
-    background: rgba(13, 17, 24, 0.96);
+    background: var(--nav-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     padding: 8px 4px calc(10px + env(safe-area-inset-bottom));
   }
   .topbar {
-    background: linear-gradient(180deg, rgba(11, 15, 20, 0.98), rgba(11, 15, 20, 0.88));
+    background: var(--topbar-bg);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-bottom: 0;
@@ -1564,8 +1640,8 @@ blockquote.trich-dan {
 
 /* Thẻ nổi bật đầu trang (dòng họ đang xem) */
 .card.hero-card {
-  background: linear-gradient(135deg, #161e2c, #1c2432);
-  border-color: #36435a;
+  background: var(--hero-bg);
+  border-color: var(--hero-border);
   position: relative;
   overflow: hidden;
 }
@@ -1577,7 +1653,7 @@ blockquote.trich-dan {
   width: 160px;
   height: 160px;
   border-radius: 50%;
-  border: 24px solid rgba(163, 255, 18, 0.06);
+  border: 24px solid var(--hero-ring);
   pointer-events: none;
 }
 .hero-head {
@@ -1655,7 +1731,7 @@ blockquote.trich-dan {
   align-items: center;
   gap: 12px;
   padding: 12px 2px;
-  border-bottom: 1px solid rgba(48, 59, 77, 0.5);
+  border-bottom: 1px solid var(--row-line);
   width: 100%;
   background: none;
   border-left: 0;
@@ -1915,7 +1991,7 @@ blockquote.trich-dan {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 18px rgba(163, 255, 18, 0.35);
+  box-shadow: var(--brand-glow);
   cursor: pointer;
 }
 .sendbtn:disabled {
