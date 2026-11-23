@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { boDau } from "@/lib/chu";
 import { del, get, put } from "@/lib/api";
 import { useLineages } from "@/lib/lineage";
 import { canManageLineage, roleLabel } from "@/lib/roles";
@@ -281,12 +282,14 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
       </>
     );
 
+  // Tìm không phân biệt dấu: "Nguyen Van An" vẫn ra "Nguyễn Văn An".
   const q = search.trim().toLowerCase();
+  const qFold = boDau(search);
   const filtered = persons.filter(
     (p) =>
       !q ||
-      p.fullName.toLowerCase().includes(q) ||
-      (p.nickname ?? "").toLowerCase().includes(q),
+      boDau(p.fullName).includes(qFold) ||
+      boDau(p.nickname ?? "").includes(qFold),
   );
   const generations = Array.from(new Set(filtered.map((p) => p.generation ?? null))).sort(
     (a, b) => (a === null ? 1 : b === null ? -1 : a - b),
@@ -385,8 +388,23 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
         <div className="card section-gap">
           <CayNhanh persons={persons} relationships={relationships} rootId={rootId} onOpen={setOpenId} />
         </div>
+      ) : q && !filtered.length ? (
+        <div className="card section-gap" role="status">
+          <p>
+            Không tìm thấy ai tên “{search.trim()}” trong họ.
+          </p>
+          <p className="muted-text" style={{ marginTop: 6 }}>
+            Thử gõ ít chữ hơn, ví dụ chỉ tên gọi (“An”), hoặc kiểm tra lại chính tả.
+          </p>
+        </div>
       ) : (
-        generations.map((g) => (
+        <>
+        {q && (
+          <p className="muted-text section-gap" role="status">
+            Tìm thấy {filtered.length} người khớp “{search.trim()}”.
+          </p>
+        )}
+        {generations.map((g) => (
           <section key={g ?? "x"} className="section-gap">
             <h2 className="card-title">{g === null ? "Chưa rõ đời" : `Đời thứ ${g}`}</h2>
             <div className="list">
@@ -417,7 +435,8 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
                 ))}
             </div>
           </section>
-        ))
+        ))}
+        </>
       )}
 
       {!demo && member.current && canManageLineage(member.current) && (
@@ -529,6 +548,8 @@ export default function GiaPha({ demo = false }: { demo?: boolean }) {
           suaAnh={!demo && !!member.current && canManageLineage(member.current)}
           onAnh={(id, url) => setPersons((ps) => ps.map((x) => (x.id === id ? { ...x, avatarUrl: url } : x)))}
           onClose={() => setOpenId(null)}
+          thanNhan={thanNhanCua(openId, persons, relationships)}
+          onMo={setOpenId}
         />
       )}
     </>
@@ -570,4 +591,43 @@ function ChoXacMinh({ lineageId }: { lineageId: string }) {
       </Link>
     </div>
   );
+}
+
+/** Cha mẹ, vợ chồng, con của một người, theo thứ tự đó; gộp hai chiều quan hệ. */
+function thanNhanCua(id: string, persons: TreePerson[], rels: CayRelationship[]) {
+  const byId = new Map(persons.map((p) => [p.id, p]));
+  const out = new Map<string, { id: string; ten: string; nhan: string; thu: number }>();
+  const them = (otherId: string, loai: "cha-me" | "vo-chong" | "con", phu = "") => {
+    const o = byId.get(otherId);
+    if (!o || out.has(otherId)) return;
+    const nu = o.gender === "female";
+    const nhan =
+      loai === "cha-me"
+        ? (nu ? "Mẹ" : o.gender === "male" ? "Cha" : "Cha/mẹ") + phu
+        : loai === "vo-chong"
+          ? (nu ? "Vợ" : o.gender === "male" ? "Chồng" : "Vợ/chồng") + phu
+          : (nu ? "Con gái" : o.gender === "male" ? "Con trai" : "Con") + phu;
+    out.set(otherId, { id: otherId, ten: o.fullName, nhan, thu: loai === "cha-me" ? 0 : loai === "vo-chong" ? 1 : 2 });
+  };
+  for (const r of rels) {
+    const t = r.relationshipType;
+    if (r.personId === id) {
+      if (t === "parent") them(r.relatedPersonId, "con");
+      else if (t === "adoptive_parent") them(r.relatedPersonId, "con", " nuôi");
+      else if (t === "child") them(r.relatedPersonId, "cha-me");
+      else if (t === "adoptive_child") them(r.relatedPersonId, "cha-me", " nuôi");
+      else if (t === "spouse") them(r.relatedPersonId, "vo-chong");
+      else if (t === "ex_spouse") them(r.relatedPersonId, "vo-chong", " (đã ly hôn)");
+    } else if (r.relatedPersonId === id) {
+      if (t === "parent") them(r.personId, "cha-me");
+      else if (t === "adoptive_parent") them(r.personId, "cha-me", " nuôi");
+      else if (t === "child") them(r.personId, "con");
+      else if (t === "adoptive_child") them(r.personId, "con", " nuôi");
+      else if (t === "spouse") them(r.personId, "vo-chong");
+      else if (t === "ex_spouse") them(r.personId, "vo-chong", " (đã ly hôn)");
+    }
+  }
+  return Array.from(out.values())
+    .sort((a, b) => a.thu - b.thu)
+    .map(({ id, ten, nhan }) => ({ id, ten, nhan }));
 }

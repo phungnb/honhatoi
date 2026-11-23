@@ -61,8 +61,13 @@ export default function HoSoNguoi({
   suaAnh = false,
   onAnh,
   onClose,
+  thanNhan = [],
+  onMo,
 }: {
   personId: string;
+  /** Cha mẹ, vợ chồng, con: lấy từ cây đã tải, bấm để mở hồ sơ người đó. */
+  thanNhan?: { id: string; ten: string; nhan: string }[];
+  onMo?: (personId: string) => void;
   demo?: boolean;
   /** Người xem có quyền sửa gia phả: hiện nút thêm/đổi/bỏ ảnh chân dung. */
   suaAnh?: boolean;
@@ -221,6 +226,25 @@ export default function HoSoNguoi({
                   </div>
                 ))}
             </dl>
+            {thanNhan.length > 0 && (
+              <div className="than-nhan">
+                <h3 className="card-title">Quan hệ gần</h3>
+                <ul>
+                  {thanNhan.map((t) => (
+                    <li key={`${t.nhan}-${t.id}`}>
+                      <span className="nhan">{t.nhan}</span>
+                      {onMo ? (
+                        <button type="button" className="link-btn" onClick={() => onMo(t.id)}>
+                          {t.ten}
+                        </button>
+                      ) : (
+                        <span>{t.ten}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {p.bio && (
               <p style={{ marginTop: 12, whiteSpace: "pre-line" }}>{p.bio}</p>
             )}

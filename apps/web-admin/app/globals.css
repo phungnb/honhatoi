@@ -2490,3 +2490,36 @@ tr.row-dragging .drag-handle { color: var(--brand); }
   background: var(--warm);
   transform: rotate(45deg);
 }
+
+/* ===== Hồ sơ: quan hệ gần (cha mẹ, vợ chồng, con) ===== */
+.than-nhan {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.than-nhan ul {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.than-nhan li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.than-nhan .nhan {
+  flex: 0 0 auto;
+  min-width: 84px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* ===== Nút đang tắt trông rõ là tắt (trước đây vẫn sáng như bấm được) ===== */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.4);
+}

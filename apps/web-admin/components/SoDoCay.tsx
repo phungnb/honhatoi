@@ -240,13 +240,17 @@ export default function SoDoCay({
   useEffect(() => {
     const el = viewRef.current;
     if (!el) return;
+    // Cuộn chuột thường để cuộn trang (trước đây cuộn qua cây là cây thu nhỏ
+    // tới mất hút). Chỉ phóng to/thu nhỏ khi giữ Ctrl/⌘ hoặc chụm trên bàn di
+    // chuột; vuốt ngang trên bàn di chuột thì kéo cây sang ngang.
     const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
       const r = el.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > Math.abs(e.deltaX) * 2) {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
         zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
-      } else {
-        setT((p) => ({ ...p, x: p.x - e.deltaX, y: p.y - e.deltaY }));
+      } else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        setT((p) => ({ ...p, x: p.x - e.deltaX }));
       }
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -479,7 +483,7 @@ export default function SoDoCay({
         <div className="ct-truc" aria-hidden />
       </div>
       <p className="muted-text sd-hint">
-        Kéo để di chuyển, chụm hai ngón để phóng to/thu nhỏ. Bấm vào tên để xem hồ sơ. Khung viền
+        Kéo để di chuyển; phóng to/thu nhỏ bằng nút + −, chụm hai ngón, hoặc giữ Ctrl và lăn chuột. Bấm vào tên để xem hồ sơ. Khung viền
         đứt nét màu nâu là con cháu nhánh ngoại (con của con gái trong họ).
       </p>
     </div>
